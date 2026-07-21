@@ -9,10 +9,10 @@
     "node": ">=18.18"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
-    "app": "next build && next start",
+    "app": "next build --webpack && next start",
     "lint": "eslint"
   },
   "dependencies": {
