@@ -29,8 +29,16 @@ interface FavRow {
   gym_distance_m: number | null;
   gym_name: string | null;
   price_per_sqft: number | null;
+  description: string | null;
   notes: string;
 }
+
+const MORE_SVG = (
+  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="7" />
+    <path d="M11 8v6M8 11h6M20 20l-3.5-3.5" />
+  </svg>
+);
 
 const GYM_SVG = `<svg viewBox="0 0 24 24" width="14" height="14" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M2 10h2v4H2zM5 8h2v8H5zM17 8h2v8h-2zM20 10h2v4h-2zM8 11h8v2H8z"/></svg>`;
 
@@ -98,6 +106,7 @@ export default function FavoritesMapPage() {
   const [gymCount, setGymCount] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<"yield" | "price">("yield");
   const [bedFilter, setBedFilter] = useState<number[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const mapRef = useRef<LeafletMap | null>(null);
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
@@ -426,11 +435,24 @@ export default function FavoritesMapPage() {
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <button
-              onClick={() => focus(r)}
-              className="line-clamp-1 text-left font-sans text-sm font-semibold normal-case tracking-normal hover:underline"
-              title="Centrar en el mapa"
+              onClick={() => setExpandedId((id) => (id === r.id ? null : r.id))}
+              className="flex min-w-0 items-center gap-1 text-left font-sans text-sm font-semibold normal-case tracking-normal hover:underline"
+              title="Ver previsualización"
             >
-              {r.title}
+              <span className="truncate">{r.title}</span>
+              <svg
+                viewBox="0 0 24 24"
+                width="12"
+                height="12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`shrink-0 text-neutral-400 transition-transform ${expandedId === r.id ? "rotate-180" : ""}`}
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
             </button>
             <button
               onClick={() => remove(r.id)}
@@ -476,6 +498,29 @@ export default function FavoritesMapPage() {
           </a>
         </span>
       </div>
+
+      {/* Preview desplegable al pulsar el título */}
+      {expandedId === r.id && (
+        <div className="mt-2 rounded-md border border-neutral-200 p-2 dark:border-neutral-800">
+          {r.images.length > 0 && (
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {r.images.slice(0, 10).map((img, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={img.medium} alt="" className="h-24 w-36 shrink-0 rounded object-cover" loading="lazy" />
+              ))}
+            </div>
+          )}
+          {r.description && (
+            <p className="mt-1.5 line-clamp-4 whitespace-pre-line text-xs text-neutral-500">{r.description}</p>
+          )}
+          <Link
+            href={`/listing/${r.id}`}
+            className="btn-font mt-2 inline-flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-500"
+          >
+            {MORE_SVG} Ver más
+          </Link>
+        </div>
+      )}
 
       <textarea
         className="mt-2 h-9 w-full resize-none rounded-md border border-transparent bg-neutral-50 px-2 py-1 text-xs outline-none focus:border-neutral-300 dark:bg-neutral-950 dark:focus:border-neutral-700"
