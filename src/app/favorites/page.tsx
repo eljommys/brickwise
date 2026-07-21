@@ -138,6 +138,7 @@ export default function FavoritesMapPage() {
   const [cafeCount, setCafeCount] = useState<number | null>(null);
   const [heatVisible, setHeatVisible] = useState(false);
   const [heatLoading, setHeatLoading] = useState(false);
+  const [heatMax, setHeatMax] = useState<number | null>(null);
   const [showLayers, setShowLayers] = useState(false);
   const [sortBy, setSortBy] = useState<"yield" | "price">("yield");
   const [bedFilter, setBedFilter] = useState<number[]>([]);
@@ -486,6 +487,7 @@ export default function FavoritesMapPage() {
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
       await import("leaflet.heat"); // patches L.heatLayer
       const max = j.max || 1;
+      setHeatMax(j.max ?? null);
       // Each favorite blooms proportionally to its tower's recent activity; a small
       // floor keeps even low-liquidity listings visible as a faint mark.
       const pts = (j.points as { lat: number; lon: number; weight: number }[]).map(
@@ -875,23 +877,27 @@ export default function FavoritesMapPage() {
       {/* ------------------------------------------------ map */}
       <div className="relative min-h-0 min-w-0 flex-1">
         <div ref={containerRef} className="absolute inset-0" />
-        <div className="pointer-events-none absolute bottom-4 left-3 z-[500] rounded border border-black/10 bg-white/90 px-2.5 py-2 text-neutral-700 shadow-lg dark:border-white/10 dark:bg-neutral-900/90 dark:text-neutral-200">
-          <div className="btn-font mb-1 text-[9px] text-neutral-500">Rentabilidad anual</div>
-          <div
-            className="h-2 w-52 rounded-sm"
-            style={{ background: "linear-gradient(90deg, hsl(0,66%,44%), hsl(87,66%,44%), hsl(174,66%,44%))" }}
-          />
-          <div className="mt-1 flex w-52 justify-between text-[10px] font-semibold">
-            <span>Mediocre</span>
-            <span>Bueno</span>
-            <span>Espectacular</span>
+        {heatVisible && (
+          <div className="pointer-events-none absolute bottom-4 left-3 z-[500] rounded border border-black/10 bg-white/90 px-2.5 py-2 text-neutral-700 shadow-lg dark:border-white/10 dark:bg-neutral-900/90 dark:text-neutral-200">
+            <div className="btn-font mb-1 text-[9px] text-neutral-500">Liquidez · transacciones/mes</div>
+            <div
+              className="h-2 w-52 rounded-sm"
+              style={{ background: "linear-gradient(90deg, #2b6cb0, #38bdf8, #a3e635, #fbbf24, #b84f30)" }}
+            />
+            <div className="mt-1 flex w-52 justify-between text-[10px] font-semibold">
+              <span>0</span>
+              {heatMax != null && <span>{(heatMax / 24).toFixed(1)}</span>}
+              {heatMax != null && <span>{(heatMax / 12).toFixed(1)}</span>}
+            </div>
+            <div className="flex w-52 justify-between text-[9px] text-neutral-500">
+              <span>parado</span>
+              <span>activo</span>
+            </div>
+            <div className="mt-0.5 w-52 text-[9px] leading-tight text-neutral-400">
+              Transacciones DLD (compra + alquiler) del edificio, últimos 12 meses.
+            </div>
           </div>
-          <div className="flex w-52 justify-between text-[9px] text-neutral-500">
-            <span>≤6%</span>
-            <span>8–9%</span>
-            <span>10%+</span>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

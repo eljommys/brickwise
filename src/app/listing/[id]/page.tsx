@@ -79,16 +79,6 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
           <h1 className="text-2xl font-bold">{listing.title}</h1>
           <YieldBadge value={analysis.gross_yield} n={analysis.rent_n} />
         </div>
-        <p className="mt-1 text-sm text-neutral-500">
-          {listing.tower_name} · {listing.bedrooms === 0 ? "Studio" : `${listing.bedrooms ?? "?"} hab`} ·{" "}
-          {listing.bathrooms ?? "?"} baños · {fmtSqft(listing.size_sqft)} · {listing.property_type}
-        </p>
-        <p className="mt-2 flex items-baseline gap-2">
-          <span className="text-3xl font-bold" style={{ color: "var(--accent)" }}>{fmtAED(listing.price)}</span>
-          {listing.size_sqft ? (
-            <span className="text-sm text-neutral-500">· {Math.round(listing.price / listing.size_sqft)} AED/sqft</span>
-          ) : null}
-        </p>
         <div className="mt-1 flex items-center gap-4">
           <a
             href={listing.url}
@@ -149,41 +139,68 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat
-          label="Rentabilidad anual de alquiler"
-          value={fmtPct(analysis.gross_yield)}
-          sub="renta anual mediana ÷ precio de venta mediana (unidades comparables del edificio)"
-          accent={analysis.gross_yield != null && analysis.gross_yield >= 0.06 ? "good" : undefined}
-        />
-        <Stat
-          label="Se alquila por (año, mediana)"
-          value={fmtAED(analysis.median_rent)}
-          sub={`${analysis.rent_n} alquiler${analysis.rent_n === 1 ? "" : "es"} de tamaño similar (±20%, 24 meses)${
-            analysis.rent_p25 != null && analysis.rent_p75 != null
-              ? ` · rango ${fmtAED(analysis.rent_p25)}–${fmtAED(analysis.rent_p75)}`
-              : ""
-          }`}
-        />
-        <Stat
-          label="Se vende por (mediana)"
-          value={fmtAED(analysis.median_sale_price)}
-          sub={`${analysis.buy_n} venta${analysis.buy_n === 1 ? "" : "s"} de tamaño similar (±20%, 24 meses)${
-            analysis.sale_p25 != null ? ` · objetivo compra p/ reformar ≈ ${fmtAED(analysis.sale_p25)} (P25)` : ""
-          }`}
-        />
-        <Stat
-          label="Rentabilidad sobre el precio del anuncio"
-          value={fmtPct(analysis.asking_yield)}
-          sub={`si lo compras por ${fmtAED(listing.price)}`}
-        />
-        <Stat
-          label="Gimnasio más cercano (OSM)"
-          value={fmtDist(analysis.gym_distance_m)}
-          sub={analysis.gym_name ?? undefined}
-        />
-        <Stat label="AED/sqft del anuncio" value={listing.size_sqft ? `${Math.round(listing.price / listing.size_sqft)} AED/sqft` : "—"} />
-      </div>
+      {/* -------- Datos básicos (raw property facts) ------------------------ */}
+      <section>
+        <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-neutral-500">Datos básicos</h2>
+        <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+          <p className="flex items-baseline gap-2">
+            <span className="text-3xl font-bold" style={{ color: "var(--accent)" }}>{fmtAED(listing.price)}</span>
+            {listing.size_sqft ? (
+              <span className="text-sm text-neutral-500">· {Math.round(listing.price / listing.size_sqft)} AED/sqft</span>
+            ) : null}
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
+            <Fact label="Superficie" value={fmtSqft(listing.size_sqft)} />
+            <Fact label="Habitaciones" value={listing.bedrooms === 0 ? "Studio" : listing.bedrooms != null ? String(listing.bedrooms) : "—"} />
+            <Fact label="Baños" value={listing.bathrooms != null ? String(listing.bathrooms) : "—"} />
+            <Fact label="Tipo" value={listing.property_type || "—"} />
+            <Fact label="AED/sqft" value={listing.size_sqft ? `${Math.round(listing.price / listing.size_sqft)}` : "—"} />
+            <Fact label="Edificio" value={listing.tower_name || "—"} />
+          </div>
+        </div>
+      </section>
+
+      {/* -------- Análisis (computed metrics) ------------------------------- */}
+      <section>
+        <h2 className="mb-2 flex items-center text-sm font-bold uppercase tracking-wide text-neutral-500">
+          Análisis
+          <InfoList items={ANALYSIS_HELP} />
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat
+            label="Rentabilidad anual de alquiler"
+            value={fmtPct(analysis.gross_yield)}
+            sub="renta anual mediana ÷ precio de venta mediana (unidades comparables del edificio)"
+            accent={analysis.gross_yield != null && analysis.gross_yield >= 0.06 ? "good" : undefined}
+          />
+          <Stat
+            label="Se alquila por (año, mediana)"
+            value={fmtAED(analysis.median_rent)}
+            sub={`${analysis.rent_n} alquiler${analysis.rent_n === 1 ? "" : "es"} de tamaño similar (±20%, 24 meses)${
+              analysis.rent_p25 != null && analysis.rent_p75 != null
+                ? ` · rango ${fmtAED(analysis.rent_p25)}–${fmtAED(analysis.rent_p75)}`
+                : ""
+            }`}
+          />
+          <Stat
+            label="Se vende por (mediana)"
+            value={fmtAED(analysis.median_sale_price)}
+            sub={`${analysis.buy_n} venta${analysis.buy_n === 1 ? "" : "s"} de tamaño similar (±20%, 24 meses)${
+              analysis.sale_p25 != null ? ` · objetivo compra p/ reformar ≈ ${fmtAED(analysis.sale_p25)} (P25)` : ""
+            }`}
+          />
+          <Stat
+            label="Rentabilidad sobre el precio del anuncio"
+            value={fmtPct(analysis.asking_yield)}
+            sub={`si lo compras por ${fmtAED(listing.price)}`}
+          />
+          <Stat
+            label="Gimnasio más cercano (OSM)"
+            value={fmtDist(analysis.gym_distance_m)}
+            sub={analysis.gym_name ?? undefined}
+          />
+        </div>
+      </section>
 
       {listing.amenities?.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
@@ -231,6 +248,57 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
         </div>
       )}
     </div>
+  );
+}
+
+const ANALYSIS_HELP: { term: string; desc: string }[] = [
+  {
+    term: "Rentabilidad anual de alquiler",
+    desc: "Renta anual mediana ÷ precio de venta mediana de unidades comparables (mismo edificio, tamaño ±20%, últimos 24 meses). Es la rentabilidad bruta que da el mercado, independiente del precio de este anuncio.",
+  },
+  {
+    term: "Se alquila por (año, mediana)",
+    desc: "Mediana de los contratos de alquiler anuales de unidades de tamaño similar (±20%) del edificio, últimos 24 meses. El rango es P25–P75: lo que pagan los pisos peor y mejor acondicionados.",
+  },
+  {
+    term: "Se vende por (mediana)",
+    desc: "Mediana de las ventas registradas en el DLD de tamaño similar (±20%), últimos 24 meses. El P25 es el tramo bajo del mercado ≈ precio objetivo de compra para reformar.",
+  },
+  {
+    term: "Rentabilidad sobre el precio del anuncio",
+    desc: "Renta anual mediana ÷ el precio que pide ESTE anuncio. Indica si este piso, a su precio, rinde por encima o por debajo de la mediana del edificio.",
+  },
+  {
+    term: "Gimnasio más cercano",
+    desc: "Distancia en línea recta al gimnasio más próximo según OpenStreetMap.",
+  },
+];
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{label}</div>
+      <div className="mt-0.5 text-sm font-medium">{value}</div>
+    </div>
+  );
+}
+
+function InfoList({ items }: { items: { term: string; desc: string }[] }) {
+  return (
+    <span className="group relative ml-2 inline-flex align-middle normal-case">
+      <span className="flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-neutral-400 text-[10px] font-bold text-neutral-500 dark:border-neutral-500">
+        ?
+      </span>
+      <span className="pointer-events-none absolute left-0 top-6 z-30 w-80 rounded-md border border-neutral-200 bg-white p-3 text-left opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:border-neutral-700 dark:bg-neutral-800">
+        <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-neutral-500">Cómo leer cada campo</span>
+        {items.map((it) => (
+          <span key={it.term} className="mb-2 block last:mb-0">
+            <span className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-200">{it.term}</span>
+            <span className="block text-[11px] font-normal leading-snug text-neutral-500 dark:text-neutral-400">{it.desc}</span>
+          </span>
+        ))}
+      </span>
+    </span>
   );
 }
 
