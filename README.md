@@ -8,7 +8,7 @@ App **100% local**: el servidor y la base de datos corren en tu máquina, sin nu
 tener [Node.js](https://nodejs.org) 18.18+ instalado.
 
 ```bash
-npx github:eljommys/brickwise
+npx brickwise
 ```
 
 Eso es todo: **instala las dependencias y arranca** (la primera vez tarda ~1 min instalando),
