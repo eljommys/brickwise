@@ -123,6 +123,7 @@ export default function FavoritesMapPage() {
   const [input, setInput] = useState("");
   const [queue, setQueue] = useState<string[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
+  const [skippedMsg, setSkippedMsg] = useState<string | null>(null);
   const [sidebarW, setSidebarW] = useState(() => {
     if (typeof window === "undefined") return 440;
     const saved = Number(localStorage.getItem("bw-sidebar-w"));
@@ -307,32 +308,62 @@ export default function FavoritesMapPage() {
       });
   }, [queue, load]);
 
-  const enqueueUrls = (raw: string): number => {
+  // Same id extraction the server does (parseListingUrl in the API route).
+  const listingIdOf = (u: string): string | null => {
+    try {
+      const p = new URL(u).pathname;
+      const m = p.match(/-(\d+)\.html$/) || p.match(/\/(\d+)(?:\/)?$/);
+      return m ? m[1] : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const enqueueUrls = (raw: string): { added: number; skipped: number } => {
     const urls = raw
       .split(/[\n\s,]+/)
       .map((s) => s.trim())
       .filter((s) => s.startsWith("http") && /propertyfinder\.ae/.test(s));
-    if (urls.length) {
-      setErrors([]);
-      setQueue((prev) => [...prev, ...urls]);
+    // Discard the ones already saved (and de-dupe the paste itself) so only new
+    // listings get analysed — no wasted scrape/round-trip on ones we already have.
+    const have = new Set((rows ?? []).map((r) => r.id));
+    const seen = new Set<string>();
+    const fresh: string[] = [];
+    let skipped = 0;
+    for (const u of urls) {
+      const id = listingIdOf(u);
+      if (id && (have.has(id) || seen.has(id))) {
+        skipped++;
+        continue;
+      }
+      if (id) seen.add(id);
+      fresh.push(u);
     }
-    return urls.length;
+    if (fresh.length) {
+      setErrors([]);
+      setQueue((prev) => [...prev, ...fresh]);
+    }
+    setSkippedMsg(skipped > 0 ? `${skipped} ya guardado${skipped === 1 ? "" : "s"}, descartado${skipped === 1 ? "" : "s"}.` : null);
+    return { added: fresh.length, skipped };
   };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (enqueueUrls(input) > 0) setInput("");
+    const { added, skipped } = enqueueUrls(input);
+    if (added > 0 || skipped > 0) setInput("");
   };
 
   const pasteFromPf = async () => {
     setSyncMsg(null);
     try {
       const text = await navigator.clipboard.readText();
-      const n = enqueueUrls(text);
+      const { added, skipped } = enqueueUrls(text);
       setSyncMsg(
-        n > 0
-          ? `${n} piso${n === 1 ? "" : "s"} en cola — analizando y añadiendo…`
-          : "El portapapeles no tenía enlaces de Property Finder. Ejecuta el marcador en tu página de Guardados primero."
+        added > 0
+          ? `${added} piso${added === 1 ? "" : "s"} nuevo${added === 1 ? "" : "s"} en cola — analizando y añadiendo…${skipped > 0 ? ` (${skipped} ya guardado${skipped === 1 ? "" : "s"})` : ""}`
+          : skipped > 0
+            ? `Los ${skipped} piso${skipped === 1 ? "" : "s"} del portapapeles ya estaban guardados. Nada nuevo que analizar.`
+            : "El portapapeles no tenía enlaces de Property Finder. Ejecuta el marcador en tu página de Guardados primero."
       );
     } catch {
       setSyncMsg("No pude leer el portapapeles. Pega los enlaces manualmente en el cuadro de arriba.");
@@ -628,6 +659,9 @@ export default function FavoritesMapPage() {
               >
                 {busy ? `Analizando ${queue.length}…` : "Añadir y analizar"}
               </button>
+              {skippedMsg && (
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{skippedMsg}</p>
+              )}
               <div className="relative">
                 <button
                   type="button"
