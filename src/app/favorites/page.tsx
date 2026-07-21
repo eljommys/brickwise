@@ -202,6 +202,9 @@ export default function FavoritesMapPage() {
         zoomControl: true,
         scrollWheelZoom: false, // replaced by the trackpad handler below
         zoomSnap: 0, // allow fractional zoom for smooth pinch
+        // leaflet.heat ghosts (duplicate shifted blobs) during the animated-zoom
+        // transform; snap zoom so the heat canvas redraws cleanly at each zoom end.
+        zoomAnimation: false,
       });
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
@@ -767,12 +770,12 @@ export default function FavoritesMapPage() {
                     <LayerToggle label="Gimnasios" color="#b84f30" loading={gymsLoading} visible={gymsVisible} count={gymCount} onToggle={toggleGyms} />
                     <LayerToggle label="Cafeterías" color="#6f4e37" loading={cafesLoading} visible={cafesVisible} count={cafeCount} onToggle={toggleCafes} />
                     <div className="my-1 border-t border-neutral-200 dark:border-neutral-800" />
-                    <p className="px-2 pb-0.5 pt-0.5 text-[10px] uppercase tracking-wide text-neutral-400">Mapa de calor de liquidez (12m)</p>
+                    <p className="px-2 pb-0.5 pt-0.5 text-[10px] uppercase tracking-wide text-neutral-400">Mapa de calor de liquidez media anual</p>
                     <LayerToggle label="Alquiler" color="#d946ef" loading={heatLoading === "rent"} visible={heatKind === "rent"} count={null} onToggle={() => toggleLiquidity("rent")} />
                     <LayerToggle label="Venta" color="#7c3aed" loading={heatLoading === "buy"} visible={heatKind === "buy"} count={null} onToggle={() => toggleLiquidity("buy")} />
                     {heatKind && (
                       <p className="px-2 pb-1 pt-0.5 text-[10px] leading-tight text-neutral-500">
-                        {heatKind === "rent" ? "Contratos de alquiler" : "Ventas"} (DLD) por edificio, últimos 12 meses. Amarillo = poco líquido, morado = mucha actividad.
+                        {heatKind === "rent" ? "Contratos de alquiler" : "Ventas"} (DLD) por edificio, media al año. Amarillo = poco líquido, morado = mucha actividad.
                       </p>
                     )}
                     {heatError && (
@@ -923,7 +926,7 @@ export default function FavoritesMapPage() {
         {heatKind && (
           <div className="pointer-events-none absolute bottom-4 left-3 z-[500] rounded border border-black/10 bg-white/90 px-2.5 py-2 text-neutral-700 shadow-lg dark:border-white/10 dark:bg-neutral-900/90 dark:text-neutral-200">
             <div className="btn-font mb-1 text-[9px] text-neutral-500">
-              Liquidez {heatKind === "rent" ? "alquiler" : "venta"} · {heatKind === "rent" ? "contratos" : "ventas"}/mes
+              Liquidez media anual · {heatKind === "rent" ? "contratos" : "ventas"}/año
             </div>
             <div
               className="h-2 w-52 rounded-sm"
@@ -931,15 +934,15 @@ export default function FavoritesMapPage() {
             />
             <div className="mt-1 flex w-52 justify-between text-[10px] font-semibold">
               <span>0</span>
-              {heatMax != null && <span>{(heatMax / 24).toFixed(1)}</span>}
-              {heatMax != null && <span>{(heatMax / 12).toFixed(1)}</span>}
+              {heatMax != null && <span>{Math.round(heatMax / 2)}</span>}
+              {heatMax != null && <span>{Math.round(heatMax)}</span>}
             </div>
             <div className="flex w-52 justify-between text-[9px] text-neutral-500">
               <span>parado</span>
               <span>activo</span>
             </div>
             <div className="mt-0.5 w-52 text-[9px] leading-tight text-neutral-400">
-              {heatKind === "rent" ? "Contratos de alquiler registrados" : "Ventas registradas"} en el DLD por edificio, últimos 12 meses.
+              {heatKind === "rent" ? "Contratos de alquiler" : "Ventas"} en el DLD por edificio, media de operaciones por año.
             </div>
           </div>
         )}

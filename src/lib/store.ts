@@ -177,20 +177,27 @@ export function listFavorites(): FavoriteListing[] {
 }
 
 /**
- * Liquidity proxy: number of DLD transactions per tower registered on/after
- * `sinceISO`, optionally restricted to one kind ('buy' | 'rent'). Raw totals are
- * capped at ~100/kind by scraping, so recent activity — not the lifetime count —
- * is what separates a liquid tower from a stale one. Returned as tower_slug → count.
+ * Average annual liquidity per tower: DLD transactions of `kind` PER YEAR, over
+ * the full stored history (total count ÷ years spanned by min→max date). Scraping
+ * caps each tower at ~100 tx, so the *rate* — not the raw count — is what compares
+ * a busy tower to a quiet one: 100 sales across 1 year is far more liquid than 100
+ * across 4. Returned as tower_slug → transactions/year.
  */
-export function txCountByTowerSince(sinceISO: string, kind?: "buy" | "rent"): Map<string, number> {
-  const db = getDb();
-  const rows = (
-    kind
-      ? db.prepare(`SELECT tower_slug, COUNT(*) n FROM transactions WHERE date >= ? AND kind = ? GROUP BY tower_slug`).all(sinceISO, kind)
-      : db.prepare(`SELECT tower_slug, COUNT(*) n FROM transactions WHERE date >= ? GROUP BY tower_slug`).all(sinceISO)
-  ) as { tower_slug: string; n: number }[];
+const MS_PER_YEAR = 365.25 * 24 * 3600 * 1000;
+export function annualLiquidityByTower(kind: "buy" | "rent"): Map<string, number> {
+  const rows = getDb()
+    .prepare(
+      `SELECT tower_slug, COUNT(*) n, MIN(date) mn, MAX(date) mx
+       FROM transactions WHERE kind = ? GROUP BY tower_slug`
+    )
+    .all(kind) as { tower_slug: string; n: number; mn: string; mx: string }[];
   const m = new Map<string, number>();
-  for (const r of rows) m.set(r.tower_slug, r.n);
+  for (const r of rows) {
+    const spanY = (Date.parse(r.mx) - Date.parse(r.mn)) / MS_PER_YEAR;
+    // Floor the span so a burst of transactions in a short window can't explode the rate.
+    const years = Math.max(spanY, 0.5);
+    m.set(r.tower_slug, r.n / years);
+  }
   return m;
 }
 
