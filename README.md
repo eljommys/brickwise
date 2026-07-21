@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🧱 Brickwise
 
-## Getting Started
+App web local (Next.js) para buscar inmuebles en venta en [Property Finder UAE](https://www.propertyfinder.ae) y analizar su **rentabilidad bruta de alquiler** con el histórico real de transacciones DLD (compra y alquiler) del propio edificio.
 
-First, run the development server:
+## Arranque en un comando
+
+App **100% local**: el servidor y la base de datos corren en tu máquina, sin nube. Solo necesitas
+tener [Node.js](https://nodejs.org) 18.18+ instalado.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npx github:eljommys/brickwise
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Eso es todo: **instala las dependencias, compila y arranca** la primera vez (~1-2 min), luego abre
+`http://localhost:3000` en tu navegador. Las siguientes veces arranca al instante. No hay nada más
+que configurar.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+<details>
+<summary>¿Prefieres clonarlo?</summary>
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+git clone https://github.com/eljommys/brickwise.git
+cd brickwise
+npm run app      # compila y arranca (uso normal)
+# o  npm run dev  para desarrollo con recarga en caliente
+```
+</details>
 
-## Learn More
+### Base de datos local
 
-To learn more about Next.js, take a look at the following resources:
+Todo (favoritos, análisis, transacciones, ubicaciones, gimnasios) se guarda en un único fichero
+**SQLite** en **`~/.brickwise/brickwise.db`** (en tu carpeta de usuario). Se crea solo al primer uso
+y **persiste entre reinicios y actualizaciones**. Para copia de seguridad o mover tus datos, basta con
+**copiar ese fichero**. Puedes cambiar su ubicación con la variable de entorno `BRICKWISE_DB`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Qué hace
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **/search** — buscador con filtros: ubicación (autocompletado local con las +16k ubicaciones de PF), precio, superficie, habitaciones, baños, tipo, amenities (gimnasio, parking, piscina…) y distancia máxima al gimnasio externo más cercano (OpenStreetMap).
+- Cada resultado se analiza en segundo plano: se scrapea la ficha del anuncio y el histórico completo de transacciones de su torre (`/en/transactions/{buy|rent}/dubai/{torre}`), y se calcula:
+  - **Rentabilidad bruta** = mediana de rentas anuales (últimos 24 meses, mismas habitaciones) / precio del anuncio.
+  - **Valor de mercado estimado** = mediana AED/sqft de ventas × superficie, y % de prima/descuento del precio frente a ese valor.
+  - **Distancia al gimnasio más cercano** vía Overpass (OSM), con caché.
+- **/listing/[id]** — ficha con galería de fotos, métricas desglosadas, tablas de transacciones de venta y alquiler del edificio y enlace al anuncio original.
+- **/** — dashboard persistente con todo lo analizado, ordenable por rentabilidad, precio, prima vs mercado o distancia al gym.
 
-## Deploy on Vercel
+## Cómo scrapea
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Property Finder es una app Next.js: cada página embebe sus datos en `<script id="__NEXT_DATA__">`. Basta un `fetch` con User-Agent de navegador (sin headless):
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Búsqueda: `/en/search?l={locId}&c=1&pf=&pt=&af=&at=&bdr[]=&am[]=&t=&page=`
+- Ficha: `share_url` del anuncio → `propertyResult.property` (incluye `similar_price_transactions` como fallback).
+- Transacciones: `/en/transactions/{buy|rent}/dubai/{slug}?page=` (paginado, tope 10 págs por tipo).
+- Ubicaciones: `/api/pwa/location/list` (~7,5k filas) + ancestros derivados de los paths → tabla `locations`.
+
+Scraping educado: cola global a **1 req/s**, retry con backoff, caché en SQLite (transacciones 7 días, gimnasios 30 días, análisis 24 h).
+
+## Estructura
+
+```
+src/lib/pf/        cliente HTTP, parser __NEXT_DATA__, search, listing, transactions, locations
+src/lib/yield.ts   cálculo de rentabilidad (medianas, ventana 24 meses, muestra por habitaciones/tamaño)
+src/lib/gyms.ts    gimnasio más cercano vía Overpass/OSM con caché
+src/lib/db.ts      SQLite (better-sqlite3) + esquema
+src/app/api/       /api/search, /api/listing/[id], /api/locations, /api/dashboard
+src/app/           páginas: dashboard, search, listing/[id]
+```
+
+## Notas
+
+- Uso personal/local. Respeta los términos de Property Finder: no elevar el rate-limit ni desplegarlo público.
+- La rentabilidad es **bruta** (sin service charges, vacancy ni costes de compra). Los tamaños muestrales (`N tx`) se muestran como indicador de confianza.

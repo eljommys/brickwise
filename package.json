@@ -2,19 +2,30 @@
   "name": "brickwise",
   "version": "0.1.0",
   "private": true,
+  "bin": {
+    "brickwise": "bin/brickwise.js"
+  },
+  "engines": {
+    "node": ">=18.18"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "app": "next build && next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "leaflet": "^1.9.4",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
