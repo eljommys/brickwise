@@ -28,6 +28,7 @@ const IH = H - M.top - M.bottom;
 const ACCENT = "#2563eb"; // comparable (same bedrooms)
 const MUTED = "#9ca3af"; // other units
 const REF = "#059669"; // this listing
+const TREND = "#7c3aed"; // tendency line
 
 function niceTicks(min: number, max: number, count: number): number[] {
   if (min === max) return [min];
@@ -77,18 +78,43 @@ export default function PsqftChart({ buy, rent, listingBedrooms, listingPsqft }:
     const refY = mode === "buy" ? listingPsqft ?? null : null;
     const tMin = Math.min(...ts);
     const tMax = Math.max(...ts);
-    let yMin = Math.min(...ys, ...(refY ? [refY] : []));
-    let yMax = Math.max(...ys, ...(refY ? [refY] : []));
+
+    // Least-squares trend over comparable units (fallback to all) — the tendency.
+    const comp = pts.filter((p) => p.comparable);
+    const fitSet = comp.length >= 2 ? comp : pts;
+    let trend: { y0: number; y1: number; annualPct: number | null } | null = null;
+    if (fitSet.length >= 2 && tMax > tMin) {
+      const n = fitSet.length;
+      const mt = fitSet.reduce((s, p) => s + p.t, 0) / n;
+      const my = fitSet.reduce((s, p) => s + p.y, 0) / n;
+      let num = 0;
+      let den = 0;
+      for (const p of fitSet) {
+        num += (p.t - mt) * (p.y - my);
+        den += (p.t - mt) ** 2;
+      }
+      const slope = den ? num / den : 0; // AED/sqft per ms
+      const intercept = my - slope * mt;
+      const YEAR = 365.25 * 24 * 3600 * 1000;
+      trend = {
+        y0: intercept + slope * tMin,
+        y1: intercept + slope * tMax,
+        annualPct: my ? (slope * YEAR) / my : null,
+      };
+    }
+
+    const extra = [...(refY ? [refY] : []), ...(trend ? [trend.y0, trend.y1] : [])];
+    let yMin = Math.min(...ys, ...extra);
+    let yMax = Math.max(...ys, ...extra);
     const pad = (yMax - yMin) * 0.1 || yMax * 0.1 || 1;
     yMin = Math.max(0, yMin - pad);
     yMax = yMax + pad;
     const x = (t: number) => (tMax === tMin ? IW / 2 : ((t - tMin) / (tMax - tMin)) * IW);
     const y = (v: number) => IH - ((v - yMin) / (yMax - yMin)) * IH;
     // median of comparable set (fallback to all)
-    const comp = pts.filter((p) => p.comparable);
     const base = (comp.length ? comp : pts).map((p) => p.y).sort((a, b) => a - b);
     const median = base.length ? base[Math.floor(base.length / 2)] : null;
-    return { x, y, tMin, tMax, yMin, yMax, refY, median };
+    return { x, y, tMin, tMax, yMin, yMax, refY, median, trend };
   }, [pts, mode, listingPsqft]);
 
   const compCount = pts.filter((p) => p.comparable).length;
@@ -181,24 +207,44 @@ export default function PsqftChart({ buy, rent, listingBedrooms, listingPsqft }:
                 </>
               )}
 
-              {/* points: muted first, comparable on top */}
+              {/* trend (least-squares) line */}
+              {scales.trend && (
+                <line
+                  x1={scales.x(scales.tMin)}
+                  x2={scales.x(scales.tMax)}
+                  y1={scales.y(scales.trend.y0)}
+                  y2={scales.y(scales.trend.y1)}
+                  stroke={TREND}
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                />
+              )}
+
+              {/* points: muted first, comparable on top; small dot + invisible hit area */}
               {pts
                 .slice()
                 .sort((a, b) => Number(a.comparable) - Number(b.comparable))
                 .map((p, i) => (
-                  <circle
-                    key={i}
-                    cx={scales.x(p.t)}
-                    cy={scales.y(p.y)}
-                    r={p.comparable ? 5 : 3.5}
-                    fill={p.comparable ? ACCENT : "none"}
-                    stroke={p.comparable ? "#fff" : MUTED}
-                    strokeWidth={p.comparable ? 1.5 : 1.5}
-                    opacity={p.comparable ? 1 : 0.7}
-                    onMouseEnter={() => setHover({ p, x: scales.x(p.t), y: scales.y(p.y) })}
-                    onMouseLeave={() => setHover(null)}
-                    style={{ cursor: "pointer" }}
-                  />
+                  <g key={i}>
+                    <circle
+                      cx={scales.x(p.t)}
+                      cy={scales.y(p.y)}
+                      r={p.comparable ? 3 : 2}
+                      fill={p.comparable ? ACCENT : MUTED}
+                      stroke="#fff"
+                      strokeWidth={p.comparable ? 1 : 0.5}
+                      opacity={p.comparable ? 1 : 0.7}
+                    />
+                    <circle
+                      cx={scales.x(p.t)}
+                      cy={scales.y(p.y)}
+                      r={8}
+                      fill="transparent"
+                      onMouseEnter={() => setHover({ p, x: scales.x(p.t), y: scales.y(p.y) })}
+                      onMouseLeave={() => setHover(null)}
+                      style={{ cursor: "pointer" }}
+                    />
+                  </g>
                 ))}
             </g>
           </svg>
@@ -235,6 +281,16 @@ export default function PsqftChart({ buy, rent, listingBedrooms, listingPsqft }:
               <span className="inline-block h-0 w-4 border-t-[1.5px] border-dashed" style={{ borderColor: MUTED }} />
               Mediana
             </span>
+            {scales.trend && (
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-0 w-4 border-t-[2.5px]" style={{ borderColor: TREND }} />
+                <span style={{ color: TREND }} className="font-semibold">
+                  Tendencia
+                  {scales.trend.annualPct != null &&
+                    ` (${scales.trend.annualPct >= 0 ? "+" : ""}${(scales.trend.annualPct * 100).toFixed(1)} %/año)`}
+                </span>
+              </span>
+            )}
             {mode === "buy" && listingPsqft != null && (
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-0 w-4 border-t-2" style={{ borderColor: REF }} />
