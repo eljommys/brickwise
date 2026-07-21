@@ -70,10 +70,10 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Inmuebles analizados</h1>
         <Link
-          href="/search"
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-500"
+          href="/favorites"
+          className="btn-font rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-500"
         >
-          + Nueva búsqueda
+          + Añadir inmuebles
         </Link>
       </div>
 
@@ -81,9 +81,9 @@ export default function Dashboard() {
         <p className="animate-pulse text-neutral-500">Cargando…</p>
       ) : sorted.length === 0 ? (
         <div className="rounded-xl border border-dashed border-neutral-300 p-10 text-center text-neutral-500 dark:border-neutral-700">
-          Aún no hay inmuebles analizados. Empieza con una{" "}
-          <Link href="/search" className="font-semibold text-blue-600 hover:underline dark:text-blue-400">
-            búsqueda
+          Aún no hay inmuebles analizados. Añade enlaces de Property Finder en{" "}
+          <Link href="/favorites" className="font-semibold text-blue-600 hover:underline dark:text-blue-400">
+            ⭐ Favoritos + Mapa
           </Link>
           .
         </div>

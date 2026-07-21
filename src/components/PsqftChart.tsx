@@ -28,7 +28,7 @@ const M = { top: 16, right: 16, bottom: 34, left: 52 };
 const IW = W - M.left - M.right;
 const IH = H - M.top - M.bottom;
 
-const ACCENT = "#2563eb"; // comparable (same bedrooms)
+const ACCENT = "#b84f30"; // comparable (similar size) — brick accent
 const MUTED = "#9ca3af"; // other units
 const REF = "#059669"; // this listing
 const TREND = "#7c3aed"; // tendency line

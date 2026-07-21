@@ -377,14 +377,11 @@ export default function FavoritesMapPage() {
         className="flex min-h-0 shrink-0 flex-col border-r border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
       >
         <div className="flex items-center gap-3 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
-          <Link href="/" className="text-sm font-bold tracking-tight">
+          <Link href="/" className="font-brand text-sm font-bold tracking-tight">
             🧱 Brickwise
           </Link>
           <span className="ml-auto flex items-center gap-1 text-xs">
-            <Link href="/search" className="rounded-full px-2.5 py-1 font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800">
-              🔍 Buscar
-            </Link>
-            <Link href="/" className="rounded-full px-2.5 py-1 font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800">
+            <Link href="/" className="btn-font rounded-full px-2.5 py-1 font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800">
               📊 Analizados
             </Link>
           </span>
@@ -488,11 +485,7 @@ export default function FavoritesMapPage() {
             <p className="animate-pulse p-4 text-sm text-neutral-500">Cargando…</p>
           ) : rows.length === 0 ? (
             <p className="p-4 text-sm text-neutral-500">
-              No hay favoritos aún. Pega arriba un enlace de Property Finder o guarda inmuebles desde{" "}
-              <Link href="/search" className="font-semibold text-blue-600 hover:underline dark:text-blue-400">
-                Buscar
-              </Link>
-              .
+              No hay favoritos aún. Pega arriba un enlace de Property Finder o usa ⟳ Sincronizar con PF.
             </p>
           ) : (
             rows.map((r) => (

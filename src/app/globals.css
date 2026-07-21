@@ -1,28 +1,119 @@
 @import "tailwindcss";
 
+/* ---- Local fonts (public/fonts) ------------------------------------- */
+
+@font-face {
+  font-family: "Stack Sans Notch";
+  src: url("/fonts/Stack_Sans_Notch/StackSansNotch-VariableFont_wght.ttf") format("truetype");
+  font-weight: 200 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mozilla Text";
+  src: url("/fonts/Mozilla_Text/MozillaText-VariableFont_wght.ttf") format("truetype");
+  font-weight: 200 700;
+  font-display: swap;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f3f1;
+  --foreground: #1c1e24;
+  --font-title: "Stack Sans Notch", system-ui, sans-serif;
+  --font-button: "Mozilla Text", system-ui, sans-serif;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-montserrat);
   --font-mono: var(--font-geist-mono);
+}
+
+@theme {
+  /* Slate-black neutrals (dark side) — negro pizarra, never pure black */
+  --color-neutral-950: #16181e;
+  --color-neutral-900: #1d2027;
+  --color-neutral-800: #282c36;
+  --color-neutral-700: #3a3f4c;
+
+  /* Brick accent — remaps every blue-* usage in the app to color ladrillo */
+  --color-blue-50: #faeee8;
+  --color-blue-100: #f5ddd2;
+  --color-blue-200: #eecebf;
+  --color-blue-300: #e0a98e;
+  --color-blue-400: #d97f5a;
+  --color-blue-500: #cd6240;
+  --color-blue-600: #b84f30;
+  --color-blue-700: #9a4126;
+  --color-blue-800: #7c3520;
+  --color-blue-900: #5a2718;
+  --color-blue-950: #38180e;
+
+  /* Pixel-art: blocky corners everywhere */
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 3px;
+  --radius-3xl: 3px;
+  --radius-4xl: 3px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #16181e; /* negro pizarra */
+    --foreground: #e8eaef;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+}
+
+/* ---- Type roles ------------------------------------------------------ */
+
+/* Titles (logo, headings) → Stack Sans Notch */
+h1,
+h2,
+h3,
+.font-brand {
+  font-family: var(--font-title);
+  letter-spacing: 0.015em;
+}
+
+/* Button text → Mozilla Text */
+button,
+.btn-font {
+  font-family: var(--font-button);
+}
+
+/* ---- Pixel-art touches ----------------------------------------------- */
+
+/* Blocky pills/badges too */
+.rounded-full {
+  border-radius: 2px;
+}
+
+/* Primary (brick) buttons: hard offset shadow + press-down */
+button[class*="bg-blue-600"],
+.btn-font[class*="bg-blue-600"] {
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
+}
+button[class*="bg-blue-600"]:active,
+.btn-font[class*="bg-blue-600"]:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+/* Cards: crisp 1px edge, no soft blur shadows */
+.shadow-sm,
+.shadow-md,
+.shadow-lg {
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.18);
 }
 
 /* ---- Map markers ---------------------------------------------------- */
@@ -38,11 +129,11 @@ body {
 .bw-pin-label {
   background: var(--pin-color, #737373);
   color: #fff;
-  font: 700 11px/1 var(--font-geist-sans), system-ui, sans-serif;
+  font: 700 11px/1 var(--font-button);
   padding: 5px 9px;
-  border-radius: 999px;
+  border-radius: 2px;
   border: 2px solid #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
   white-space: nowrap;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
@@ -58,21 +149,21 @@ body {
 .bw-pin--hl .bw-pin-label {
   transform: scale(1.22);
   box-shadow:
-    0 0 0 4px rgba(59, 130, 246, 0.5),
-    0 3px 10px rgba(0, 0, 0, 0.45);
+    0 0 0 4px rgba(184, 79, 48, 0.55),
+    3px 3px 0 rgba(0, 0, 0, 0.4);
 }
 
-/* Gym marker: blue disc with a white dumbbell. */
+/* Gym marker: brick square with a white dumbbell. */
 .bw-gym {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #1d4ed8;
+  width: 26px;
+  height: 26px;
+  border-radius: 2px;
+  background: #b84f30;
   border: 2px solid #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
   transform: translate(-50%, -50%);
   cursor: pointer;
 }
