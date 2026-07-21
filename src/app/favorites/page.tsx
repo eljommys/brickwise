@@ -34,6 +34,15 @@ interface FavRow {
   notes: string;
 }
 
+interface GymRow {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  url: string | null;
+  added_at: string;
+}
+
 const MORE_SVG = (
   <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="11" cy="11" r="7" />
@@ -146,8 +155,10 @@ export default function FavoritesMapPage() {
   });
   const [mapReady, setMapReady] = useState(false);
   const [gymsVisible, setGymsVisible] = useState(false);
-  const [gymsLoading, setGymsLoading] = useState(false);
-  const [gymCount, setGymCount] = useState<number | null>(null);
+  const [savedGyms, setSavedGyms] = useState<GymRow[]>([]);
+  const [gymInput, setGymInput] = useState("");
+  const [gymBusy, setGymBusy] = useState(false);
+  const [gymError, setGymError] = useState<string | null>(null);
   const [cafesVisible, setCafesVisible] = useState(false);
   const [cafesLoading, setCafesLoading] = useState(false);
   const [cafeCount, setCafeCount] = useState<number | null>(null);
@@ -188,6 +199,14 @@ export default function FavoritesMapPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Load the user's saved gyms once (local DB, cheap).
+  useEffect(() => {
+    fetch("/api/gyms")
+      .then((r) => r.json())
+      .then((j) => setSavedGyms(j.gyms || []))
+      .catch(() => setSavedGyms([]));
+  }, []);
 
   // --- Map creation (once) -------------------------------------------------
   useEffect(() => {
@@ -487,11 +506,84 @@ export default function FavoritesMapPage() {
     }
   };
 
-  const toggleGyms = () =>
-    togglePoi({
-      api: "/api/gyms", dataKey: "gyms", cssClass: "bw-gym", svg: GYM_SVG,
-      layerRef: gymLayerRef, visible: gymsVisible, setVisible: setGymsVisible, setLoading: setGymsLoading, setCount: setGymCount,
-    });
+  // --- Manual gyms (user-curated via Google Maps links) --------------------
+  const buildGymLayer = (L: typeof import("leaflet"), gyms: GymRow[]) => {
+    const layer = L.layerGroup();
+    for (const g of gyms) {
+      const icon = L.divIcon({ className: "", html: `<div class="bw-gym">${GYM_SVG}</div>`, iconSize: [0, 0], iconAnchor: [0, 0] });
+      const safeName = g.name.replace(/[<>&"]/g, (c) => `&#${c.charCodeAt(0)};`);
+      const mapsUrl = g.url || `https://www.google.com/maps/search/${encodeURIComponent(g.name)}/@${g.lat},${g.lon},17z`;
+      L.marker([g.lat, g.lon], { icon })
+        .bindPopup(
+          `<b>${safeName}</b><br><a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" style="font-size:12px">Ver en Google Maps ↗</a>`,
+          { offset: [0, -16] }
+        )
+        .addTo(layer);
+    }
+    return layer;
+  };
+
+  // Push a gym set to state and, if the layer is showing, rebuild it in place.
+  const applyGyms = (gyms: GymRow[]) => {
+    setSavedGyms(gyms);
+    const map = mapRef.current;
+    const L = leafletRef.current;
+    if (map && L && gymsVisible) {
+      if (gymLayerRef.current) map.removeLayer(gymLayerRef.current);
+      const layer = buildGymLayer(L, gyms);
+      layer.addTo(map);
+      gymLayerRef.current = layer;
+    }
+  };
+
+  const toggleGyms = () => {
+    const map = mapRef.current;
+    const L = leafletRef.current;
+    if (!map || !L) return;
+    if (gymsVisible) {
+      if (gymLayerRef.current) map.removeLayer(gymLayerRef.current);
+      setGymsVisible(false);
+    } else {
+      if (gymLayerRef.current) map.removeLayer(gymLayerRef.current);
+      const layer = buildGymLayer(L, savedGyms);
+      layer.addTo(map);
+      gymLayerRef.current = layer;
+      setGymsVisible(true);
+    }
+  };
+
+  const addGymFromLink = async () => {
+    const url = gymInput.trim();
+    if (!url) return;
+    setGymBusy(true);
+    setGymError(null);
+    try {
+      const res = await fetch("/api/gyms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      const list = await (await fetch("/api/gyms")).json();
+      applyGyms(list.gyms || []);
+      setGymInput("");
+    } catch (e) {
+      setGymError((e as Error).message);
+    } finally {
+      setGymBusy(false);
+    }
+  };
+
+  const deleteGym = async (id: string) => {
+    try {
+      await fetch(`/api/gyms?id=${id}`, { method: "DELETE" });
+      const list = await (await fetch("/api/gyms")).json();
+      applyGyms(list.gyms || []);
+    } catch {
+      /* leave the list as-is on failure */
+    }
+  };
 
   const toggleCafes = () =>
     togglePoi({
@@ -767,7 +859,51 @@ export default function FavoritesMapPage() {
                 {showLayers && (
                   <div className="absolute inset-x-0 top-full z-30 mt-1 rounded-lg border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-800 dark:bg-neutral-900">
                     <p className="px-2 pb-0.5 pt-1 text-[10px] uppercase tracking-wide text-neutral-400">Puntos cercanos</p>
-                    <LayerToggle label="Gimnasios" color="#b84f30" loading={gymsLoading} visible={gymsVisible} count={gymCount} onToggle={toggleGyms} />
+                    <LayerToggle label="Gimnasios" color="#b84f30" loading={false} visible={gymsVisible} count={savedGyms.length || null} onToggle={toggleGyms} />
+                    {/* Manual gym management: paste a Google Maps link */}
+                    <div className="px-2 pb-1.5 pt-0.5">
+                      <div className="flex gap-1">
+                        <input
+                          value={gymInput}
+                          onChange={(e) => setGymInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addGymFromLink();
+                            }
+                          }}
+                          placeholder="Pega enlace de Google Maps del gym…"
+                          className="min-w-0 flex-1 rounded border border-neutral-300 bg-white px-1.5 py-1 text-[11px] outline-none focus:border-blue-500 dark:border-neutral-700 dark:bg-neutral-950"
+                        />
+                        <button
+                          type="button"
+                          onClick={addGymFromLink}
+                          disabled={gymBusy || !gymInput.trim()}
+                          className="btn-font rounded bg-blue-600 px-2 py-1 text-[10px] font-bold text-white disabled:opacity-50"
+                        >
+                          {gymBusy ? "…" : "Añadir"}
+                        </button>
+                      </div>
+                      {gymError && <p className="mt-1 text-[10px] leading-tight text-red-600 dark:text-red-400">{gymError}</p>}
+                      {savedGyms.length > 0 && (
+                        <ul className="mt-1.5 space-y-0.5">
+                          {savedGyms.map((g) => (
+                            <li key={g.id} className="flex items-center gap-1 text-[11px]">
+                              <span className="inline-block h-2 w-2 shrink-0 rounded-sm" style={{ background: "#b84f30" }} />
+                              <span className="flex-1 truncate" title={g.name}>{g.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => deleteGym(g.id)}
+                                title="Eliminar"
+                                className="shrink-0 px-1 text-neutral-400 hover:text-red-600"
+                              >
+                                ✕
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                     <LayerToggle label="Cafeterías" color="#6f4e37" loading={cafesLoading} visible={cafesVisible} count={cafeCount} onToggle={toggleCafes} />
                     <div className="my-1 border-t border-neutral-200 dark:border-neutral-800" />
                     <p className="px-2 pb-0.5 pt-0.5 text-[10px] uppercase tracking-wide text-neutral-400">Mapa de calor de liquidez media anual</p>

@@ -1,8 +1,7 @@
 import { scrapeListing } from "./pf/listing";
 import { getTransactions, syncTransactions } from "./pf/transactions";
 import { computeYield, similarToTxRows } from "./yield";
-import { nearestGym } from "./gyms";
-import { getAnalysis, getListing, saveAnalysis, upsertListing } from "./store";
+import { getAnalysis, getListing, nearestManualGym, saveAnalysis, upsertListing } from "./store";
 import { AnalysisRow, ListingRow } from "./types";
 
 const ANALYSIS_TTL_MS = 24 * 3600 * 1000;
@@ -43,7 +42,7 @@ export async function analyzeListing(id: string, url?: string, force = false): P
   const yieldRes = computeYield(listing.price, listing.size_sqft, listing.bedrooms, buy, rent);
   const gym =
     listing.lat != null && listing.lon != null
-      ? await nearestGym(listing.lat, listing.lon)
+      ? nearestManualGym(listing.lat, listing.lon)
       : { gym_name: null, distance_m: null };
 
   saveAnalysis(listing.id, yieldRes, gym);

@@ -214,7 +214,7 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
             sub={`si lo compras por ${fmtAED(listing.price)}`}
           />
           <Stat
-            label="Gimnasio más cercano (OSM)"
+            label="Gimnasio guardado más cercano"
             value={fmtDist(analysis.gym_distance_m)}
             sub={analysis.gym_name ?? undefined}
           />
@@ -292,8 +292,8 @@ const ANALYSIS_HELP: { term: string; desc: string }[] = [
     desc: "AED/sqft del anuncio frente a la línea de tendencia de ventas comparables (la misma del gráfico), evaluada en la fecha más reciente. Verde = por debajo de la tendencia (descuento); rojo = por encima (sobreprecio).",
   },
   {
-    term: "Gimnasio más cercano",
-    desc: "Distancia en línea recta al gimnasio más próximo según OpenStreetMap.",
+    term: "Gimnasio guardado más cercano",
+    desc: "Distancia en línea recta al más cercano de los gimnasios que has guardado manualmente (desde el mapa, pegando su enlace de Google Maps).",
   },
 ];
 

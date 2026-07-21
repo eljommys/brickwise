@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { createHash } from "crypto";
 import { getDb, now } from "./db";
 import { AnalysisRow, ListingRow, PfProperty, YieldResult } from "./types";
 
@@ -154,6 +155,50 @@ export function removeFavorite(listingId: string) {
 
 export function setFavoriteNotes(listingId: string, notes: string) {
   getDb().prepare(`UPDATE favorites SET notes = ? WHERE listing_id = ?`).run(notes, listingId);
+}
+
+// --- Manual gyms (curated by the user via Google Maps links) ---------------
+
+export interface GymRow {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  url: string | null;
+  added_at: string;
+}
+
+export function addGym(g: { name: string; lat: number; lon: number; url?: string | null }): GymRow {
+  const id = createHash("md5").update(`${g.lat.toFixed(5)},${g.lon.toFixed(5)}`).digest("hex").slice(0, 12);
+  getDb()
+    .prepare(`INSERT OR REPLACE INTO gyms (id, name, lat, lon, url, added_at) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(id, g.name, g.lat, g.lon, g.url ?? null, now());
+  return { id, name: g.name, lat: g.lat, lon: g.lon, url: g.url ?? null, added_at: now() };
+}
+
+export function listGyms(): GymRow[] {
+  return getDb().prepare(`SELECT * FROM gyms ORDER BY name COLLATE NOCASE`).all() as GymRow[];
+}
+
+export function removeGym(id: string) {
+  getDb().prepare(`DELETE FROM gyms WHERE id = ?`).run(id);
+}
+
+/** Nearest user-saved gym to a point, by straight-line distance. */
+export function nearestManualGym(lat: number, lon: number): { gym_name: string | null; distance_m: number | null } {
+  const gyms = listGyms();
+  if (!gyms.length) return { gym_name: null, distance_m: null };
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  let best: { name: string; d: number } | null = null;
+  for (const g of gyms) {
+    const dLat = toRad(g.lat - lat);
+    const dLon = toRad(g.lon - lon);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat)) * Math.cos(toRad(g.lat)) * Math.sin(dLon / 2) ** 2;
+    const d = 2 * R * Math.asin(Math.sqrt(a));
+    if (!best || d < best.d) best = { name: g.name, d };
+  }
+  return best ? { gym_name: best.name, distance_m: Math.round(best.d) } : { gym_name: null, distance_m: null };
 }
 
 export interface FavoriteListing extends AnalyzedListing {

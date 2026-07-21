@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getTransactions } from "@/lib/pf/transactions";
 import { computeYield } from "@/lib/yield";
-import { getAnalysis, saveAnalysis } from "@/lib/store";
+import { nearestManualGym, saveAnalysis } from "@/lib/store";
 import { ListingRow } from "@/lib/types";
 
 /** Recompute every stored analysis from the cached transactions (no scraping). */
@@ -17,8 +17,11 @@ export async function POST() {
       const buy = l.tower_slug ? getTransactions(l.tower_slug, "buy") : [];
       const rent = l.tower_slug ? getTransactions(l.tower_slug, "rent") : [];
       const y = computeYield(l.price, l.size_sqft, l.bedrooms, buy, rent);
-      const prev = getAnalysis(l.id);
-      saveAnalysis(l.id, y, { gym_name: prev?.gym_name ?? null, distance_m: prev?.gym_distance_m ?? null });
+      const gym =
+        l.lat != null && l.lon != null
+          ? nearestManualGym(l.lat, l.lon)
+          : { gym_name: null, distance_m: null };
+      saveAnalysis(l.id, y, gym);
       updated++;
     }
     return NextResponse.json({ updated });

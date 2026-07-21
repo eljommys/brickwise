@@ -114,6 +114,16 @@ CREATE TABLE IF NOT EXISTS favorites (
   added_at TEXT NOT NULL
 );
 
+-- User-curated gyms (added by pasting a Google Maps link), not OSM.
+CREATE TABLE IF NOT EXISTS gyms (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  lat REAL NOT NULL,
+  lon REAL NOT NULL,
+  url TEXT,
+  added_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS analyses (
   listing_id TEXT PRIMARY KEY REFERENCES listings(id),
   gross_yield REAL,
