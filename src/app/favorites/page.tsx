@@ -136,6 +136,8 @@ export default function FavoritesMapPage() {
   const [cafesVisible, setCafesVisible] = useState(false);
   const [cafesLoading, setCafesLoading] = useState(false);
   const [cafeCount, setCafeCount] = useState<number | null>(null);
+  const [heatVisible, setHeatVisible] = useState(false);
+  const [heatLoading, setHeatLoading] = useState(false);
   const [showLayers, setShowLayers] = useState(false);
   const [sortBy, setSortBy] = useState<"yield" | "price">("yield");
   const [bedFilter, setBedFilter] = useState<number[]>([]);
@@ -146,6 +148,7 @@ export default function FavoritesMapPage() {
   const markersRef = useRef<Record<string, Marker>>({});
   const gymLayerRef = useRef<LayerGroup | null>(null);
   const cafeLayerRef = useRef<LayerGroup | null>(null);
+  const heatLayerRef = useRef<import("leaflet").Layer | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const didFitRef = useRef(false);
   const processing = useRef(false);
@@ -466,6 +469,49 @@ export default function FavoritesMapPage() {
       layerRef: cafeLayerRef, visible: cafesVisible, setVisible: setCafesVisible, setLoading: setCafesLoading, setCount: setCafeCount,
     });
 
+  // Liquidity heatmap: DLD transactions per tower (last 12 months) as a heat surface.
+  const toggleLiquidity = async () => {
+    const map = mapRef.current;
+    if (!map || !leafletRef.current) return;
+    if (heatLayerRef.current) {
+      if (heatVisible) map.removeLayer(heatLayerRef.current);
+      else heatLayerRef.current.addTo(map);
+      setHeatVisible(!heatVisible);
+      return;
+    }
+    setHeatLoading(true);
+    try {
+      const res = await fetch("/api/liquidity");
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      await import("leaflet.heat"); // patches L.heatLayer
+      const max = j.max || 1;
+      // Each favorite blooms proportionally to its tower's recent activity; a small
+      // floor keeps even low-liquidity listings visible as a faint mark.
+      const pts = (j.points as { lat: number; lon: number; weight: number }[]).map(
+        (p) => [p.lat, p.lon, Math.max(0.12, p.weight / max)] as [number, number, number]
+      );
+      type HeatFn = (latlngs: [number, number, number][], opts?: Record<string, unknown>) => import("leaflet").Layer;
+      const Lmod = leafletRef.current as unknown as { heatLayer?: HeatFn; default?: { heatLayer?: HeatFn } };
+      const heatLayer = Lmod.heatLayer ?? Lmod.default?.heatLayer;
+      if (!heatLayer) throw new Error("plugin de calor no disponible");
+      const layer = heatLayer(pts, {
+        radius: 38,
+        blur: 28,
+        max: 1,
+        minOpacity: 0.25,
+        gradient: { 0.2: "#2b6cb0", 0.4: "#38bdf8", 0.6: "#a3e635", 0.8: "#fbbf24", 1.0: "#b84f30" },
+      });
+      layer.addTo(map);
+      heatLayerRef.current = layer;
+      setHeatVisible(true);
+    } catch {
+      setHeatVisible(false);
+    } finally {
+      setHeatLoading(false);
+    }
+  };
+
   // --- Resizable divider ---------------------------------------------------
   const startDrag = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -669,15 +715,24 @@ export default function FavoritesMapPage() {
                   disabled={(rows?.length ?? 0) === 0}
                   className="flex w-full items-center justify-center gap-1 rounded-lg border border-neutral-300 py-2 text-xs font-semibold hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
                 >
-                  Puntos cercanos
+                  Capas del mapa
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${showLayers ? "rotate-180" : ""}`}>
                     <path d="M6 9l6 6 6-6" />
                   </svg>
                 </button>
                 {showLayers && (
                   <div className="absolute inset-x-0 top-full z-30 mt-1 rounded-lg border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-800 dark:bg-neutral-900">
+                    <p className="px-2 pb-0.5 pt-1 text-[10px] uppercase tracking-wide text-neutral-400">Puntos cercanos</p>
                     <LayerToggle label="Gimnasios" color="#b84f30" loading={gymsLoading} visible={gymsVisible} count={gymCount} onToggle={toggleGyms} />
                     <LayerToggle label="Cafeterías" color="#6f4e37" loading={cafesLoading} visible={cafesVisible} count={cafeCount} onToggle={toggleCafes} />
+                    <div className="my-1 border-t border-neutral-200 dark:border-neutral-800" />
+                    <p className="px-2 pb-0.5 pt-0.5 text-[10px] uppercase tracking-wide text-neutral-400">Mapa de calor</p>
+                    <LayerToggle label="Liquidez (12m)" color="#fbbf24" loading={heatLoading} visible={heatVisible} count={null} onToggle={toggleLiquidity} />
+                    {heatVisible && (
+                      <p className="px-2 pb-1 pt-0.5 text-[10px] leading-tight text-neutral-500">
+                        Transacciones DLD por edificio (últimos 12 meses). Frío = poco líquido, cálido = mucha actividad.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

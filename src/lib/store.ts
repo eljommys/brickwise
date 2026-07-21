@@ -176,6 +176,21 @@ export function listFavorites(): FavoriteListing[] {
     .all() as FavoriteListing[];
 }
 
+/**
+ * Liquidity proxy: number of DLD transactions (buy + rent) per tower registered
+ * on/after `sinceISO`. Raw totals are capped at ~100/kind by scraping, so recent
+ * activity — not the lifetime count — is what separates a liquid tower from a stale
+ * one. Returned as tower_slug → count.
+ */
+export function txCountByTowerSince(sinceISO: string): Map<string, number> {
+  const rows = getDb()
+    .prepare(`SELECT tower_slug, COUNT(*) n FROM transactions WHERE date >= ? GROUP BY tower_slug`)
+    .all(sinceISO) as { tower_slug: string; n: number }[];
+  const m = new Map<string, number>();
+  for (const r of rows) m.set(r.tower_slug, r.n);
+  return m;
+}
+
 export function listAnalyzed(): AnalyzedListing[] {
   return getDb()
     .prepare(
