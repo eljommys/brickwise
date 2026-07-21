@@ -1,37 +1,15 @@
 import { NextResponse } from "next/server";
-import { gymsNear } from "@/lib/gyms";
+import { poisForPoints } from "@/lib/pois";
 import { listFavorites } from "@/lib/store";
 
-/** All gyms within 2 km of every located favorite, deduplicated. */
+/** All gyms near any located favorite, in a single Overpass query. */
 export async function GET() {
   try {
-    const favorites = listFavorites().filter((f) => f.lat != null && f.lon != null);
-    // Query once per ~100 m cell — nearby favorites share the same cached result.
-    const cells = new Map<string, { lat: number; lon: number }>();
-    for (const f of favorites) {
-      const key = `${f.lat!.toFixed(3)},${f.lon!.toFixed(3)}`;
-      if (!cells.has(key)) cells.set(key, { lat: f.lat!, lon: f.lon! });
-    }
-    const seen = new Map<string, { name: string; lat: number; lon: number }>();
-    let failed = 0;
-    const deadline = Date.now() + 45000; // never hang the request
-    for (const f of cells.values()) {
-      if (Date.now() > deadline) break;
-      const gyms = await gymsNear(f.lat, f.lon);
-      if (gyms == null) {
-        failed++;
-        continue;
-      }
-      for (const g of gyms) {
-        const key = `${g.lat.toFixed(5)},${g.lon.toFixed(5)}`;
-        if (!seen.has(key)) seen.set(key, { name: g.name, lat: g.lat, lon: g.lon });
-      }
-    }
-    return NextResponse.json({
-      gyms: [...seen.values()],
-      favoritesQueried: cells.size,
-      failed,
-    });
+    const points = listFavorites()
+      .filter((f) => f.lat != null && f.lon != null)
+      .map((f) => ({ lat: f.lat!, lon: f.lon! }));
+    const { pois, failed } = await poisForPoints(points, "gym");
+    return NextResponse.json({ gyms: pois, favoritesQueried: points.length, failed });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

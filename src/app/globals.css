@@ -159,32 +159,30 @@ button[class*="bg-blue-5"],
   border-color: rgba(255, 255, 255, 0.4);
 }
 
-/* Gym marker: brick square with a white dumbbell. */
-.bw-gym {
-  width: 24px;
-  height: 24px;
-  border-radius: 2px;
-  background: var(--accent);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  transform: translate(-50%, -50%);
-  cursor: pointer;
-}
-
-/* Café marker: coffee-brown square with a white cup. */
+/* POI markers (gym / café): semi-transparent square with a white icon. */
+.bw-gym,
 .bw-cafe {
   width: 24px;
   height: 24px;
   border-radius: 2px;
-  background: #6f4e37;
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   transform: translate(-50%, -50%);
   cursor: pointer;
+  transition: opacity 0.12s ease;
+}
+.bw-gym {
+  background: rgba(184, 79, 48, 0.68); /* brick, transparent */
+  opacity: 0.9;
+}
+.bw-cafe {
+  background: rgba(111, 78, 55, 0.68); /* coffee, transparent */
+  opacity: 0.9;
+}
+.bw-gym:hover,
+.bw-cafe:hover {
+  opacity: 1;
 }

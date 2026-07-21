@@ -77,6 +77,44 @@ const SAVED_URL = "https://www.propertyfinder.ae/en/user/saved-properties";
 // strips javascript: hrefs.
 const BOOKMARKLET = String.raw`javascript:(function(){var u=new Set();document.querySelectorAll('a[href]').forEach(function(a){var h=(a.href||'').split('?')[0];if(/\/plp\/.*-\d+\.html$/.test(h))u.add(h)});try{var n=document.getElementById('__NEXT_DATA__');if(n){(JSON.stringify(JSON.parse(n.textContent)).match(/https?:\/\/[^"']*\/plp\/[^"']*-\d+\.html/g)||[]).forEach(function(x){u.add(x.split('?')[0])})}}catch(e){}var l=[...u];if(!l.length){alert('No encontre pisos guardados aqui. Abre tu pagina de Guardados de Property Finder con la sesion iniciada.');return}var t=l.join('\n');if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){alert(l.length+' piso(s) copiados. Abre Brickwise y pulsa "Pegar de Property Finder".')},function(){prompt('Copia estos enlaces y pegalos en Brickwise:',t)})}else{prompt('Copia estos enlaces y pegalos en Brickwise:',t)}})();`;
 
+function LayerToggle({
+  label,
+  color,
+  loading,
+  visible,
+  count,
+  onToggle,
+}: {
+  label: string;
+  color: string;
+  loading: boolean;
+  visible: boolean;
+  count: number | null;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={loading}
+      className="btn-font flex w-full items-center gap-2 rounded px-2 py-1.5 text-[11px] hover:bg-neutral-100 disabled:opacity-60 dark:hover:bg-neutral-800"
+    >
+      <span
+        className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border"
+        style={{ background: visible ? color : "transparent", borderColor: color, opacity: 0.85 }}
+      >
+        {visible && (
+          <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12l5 5L20 6" />
+          </svg>
+        )}
+      </span>
+      <span className="flex-1 text-left">{label}</span>
+      <span className="text-neutral-500">{loading ? "Buscando…" : count != null ? count : ""}</span>
+    </button>
+  );
+}
+
 export default function FavoritesMapPage() {
   const [rows, setRows] = useState<FavRow[] | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -97,6 +135,7 @@ export default function FavoritesMapPage() {
   const [cafesVisible, setCafesVisible] = useState(false);
   const [cafesLoading, setCafesLoading] = useState(false);
   const [cafeCount, setCafeCount] = useState<number | null>(null);
+  const [showLayers, setShowLayers] = useState(false);
   const [sortBy, setSortBy] = useState<"yield" | "price">("yield");
   const [bedFilter, setBedFilter] = useState<number[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -587,35 +626,24 @@ export default function FavoritesMapPage() {
               >
                 {busy ? `Analizando ${queue.length}…` : "Añadir y analizar"}
               </button>
-              <div className="flex gap-1.5">
+              <div className="relative">
                 <button
                   type="button"
-                  onClick={toggleGyms}
-                  disabled={gymsLoading || (rows?.length ?? 0) === 0}
-                  className="flex-1 rounded-lg border border-neutral-300 py-2 text-xs font-semibold hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                  onClick={() => setShowLayers((v) => !v)}
+                  disabled={(rows?.length ?? 0) === 0}
+                  className="flex w-full items-center justify-center gap-1 rounded-lg border border-neutral-300 py-2 text-xs font-semibold hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
                 >
-                  {gymsLoading
-                    ? "Buscando…"
-                    : gymCount != null
-                      ? gymsVisible
-                        ? `Ocultar gyms (${gymCount})`
-                        : `Mostrar gyms (${gymCount})`
-                      : "Gimnasios"}
+                  Puntos cercanos
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${showLayers ? "rotate-180" : ""}`}>
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
                 </button>
-                <button
-                  type="button"
-                  onClick={toggleCafes}
-                  disabled={cafesLoading || (rows?.length ?? 0) === 0}
-                  className="flex-1 rounded-lg border border-neutral-300 py-2 text-xs font-semibold hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
-                >
-                  {cafesLoading
-                    ? "Buscando…"
-                    : cafeCount != null
-                      ? cafesVisible
-                        ? `Ocultar cafés (${cafeCount})`
-                        : `Mostrar cafés (${cafeCount})`
-                      : "Cafeterías"}
-                </button>
+                {showLayers && (
+                  <div className="absolute inset-x-0 top-full z-30 mt-1 rounded-lg border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-800 dark:bg-neutral-900">
+                    <LayerToggle label="Gimnasios" color="#b84f30" loading={gymsLoading} visible={gymsVisible} count={gymCount} onToggle={toggleGyms} />
+                    <LayerToggle label="Cafeterías" color="#6f4e37" loading={cafesLoading} visible={cafesVisible} count={cafeCount} onToggle={toggleCafes} />
+                  </div>
+                )}
               </div>
               <button
                 type="button"
