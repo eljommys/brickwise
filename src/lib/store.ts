@@ -112,8 +112,9 @@ export function saveAnalysis(listingId: string, y: YieldResult, gym: { gym_name:
     .prepare(
       `INSERT OR REPLACE INTO analyses
        (listing_id, gross_yield, asking_yield, median_rent, median_sale_price,
+        rent_p25, rent_p75, sale_p25, sale_p75,
         rent_n, buy_n, gym_distance_m, gym_name, computed_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       listingId,
@@ -121,6 +122,10 @@ export function saveAnalysis(listingId: string, y: YieldResult, gym: { gym_name:
       y.asking_yield,
       y.median_rent,
       y.median_sale_price,
+      y.rent_p25,
+      y.rent_p75,
+      y.sale_p25,
+      y.sale_p75,
       y.rent_n,
       y.buy_n,
       gym.distance_m,
@@ -160,6 +165,7 @@ export function listFavorites(): FavoriteListing[] {
   return getDb()
     .prepare(
       `SELECT l.*, a.gross_yield, a.asking_yield, a.median_rent, a.median_sale_price,
+              a.rent_p25, a.rent_p75, a.sale_p25, a.sale_p75,
               a.rent_n, a.buy_n, a.gym_distance_m, a.gym_name, a.computed_at,
               f.notes, f.added_at
        FROM favorites f
@@ -174,6 +180,7 @@ export function listAnalyzed(): AnalyzedListing[] {
   return getDb()
     .prepare(
       `SELECT l.*, a.gross_yield, a.asking_yield, a.median_rent, a.median_sale_price,
+              a.rent_p25, a.rent_p75, a.sale_p25, a.sale_p75,
               a.rent_n, a.buy_n, a.gym_distance_m, a.gym_name, a.computed_at
        FROM listings l JOIN analyses a ON a.listing_id = l.id
        ORDER BY a.gross_yield DESC NULLS LAST`

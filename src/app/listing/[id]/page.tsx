@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import YieldBadge from "@/components/YieldBadge";
 import TransactionsTable from "@/components/TransactionsTable";
 import PsqftChart from "@/components/PsqftChart";
+import ReformScenario from "@/components/ReformScenario";
 import { fmtAED, fmtDist, fmtPct, fmtSqft } from "@/lib/format";
 import { AnalysisRow } from "@/lib/types";
 import { TxRow } from "@/lib/pf/transactions";
@@ -152,12 +153,18 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
         <Stat
           label="Se alquila por (año, mediana)"
           value={fmtAED(analysis.median_rent)}
-          sub={`${analysis.rent_n} contrato${analysis.rent_n === 1 ? "" : "s"} de alquiler comparables (24 meses)`}
+          sub={`${analysis.rent_n} alquiler${analysis.rent_n === 1 ? "" : "es"} de tamaño similar (±20%, 24 meses)${
+            analysis.rent_p25 != null && analysis.rent_p75 != null
+              ? ` · rango ${fmtAED(analysis.rent_p25)}–${fmtAED(analysis.rent_p75)}`
+              : ""
+          }`}
         />
         <Stat
           label="Se vende por (mediana)"
           value={fmtAED(analysis.median_sale_price)}
-          sub={`${analysis.buy_n} venta${analysis.buy_n === 1 ? "" : "s"} comparables (24 meses)`}
+          sub={`${analysis.buy_n} venta${analysis.buy_n === 1 ? "" : "s"} de tamaño similar (±20%, 24 meses)${
+            analysis.sale_p25 != null ? ` · objetivo compra p/ reformar ≈ ${fmtAED(analysis.sale_p25)} (P25)` : ""
+          }`}
         />
         <Stat
           label="Rentabilidad sobre el precio del anuncio"
@@ -182,11 +189,19 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
         </div>
       )}
 
+      <ReformScenario
+        listingId={listing.id}
+        price={listing.price}
+        sizeSqft={listing.size_sqft}
+        analysis={analysis}
+      />
+
       {transactions && (transactions.buy.length > 0 || transactions.rent.length > 0) && (
         <PsqftChart
           buy={transactions.buy}
           rent={transactions.rent}
           listingBedrooms={listing.bedrooms}
+          listingSizeSqft={listing.size_sqft}
           listingPsqft={listing.size_sqft ? listing.price / listing.size_sqft : null}
         />
       )}

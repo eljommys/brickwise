@@ -7,8 +7,11 @@ interface Props {
   buy: TxRow[];
   rent: TxRow[];
   listingBedrooms: number | null;
+  listingSizeSqft: number | null;
   listingPsqft: number | null; // asking price / size
 }
+
+const SIZE_TOLERANCE = 0.2;
 
 interface Pt {
   t: number; // date ms
@@ -48,7 +51,7 @@ const fmtMonth = (ms: number) =>
 const fmtDate = (ms: number) => new Date(ms).toLocaleDateString("es-ES");
 const fmtAED = (n: number) => new Intl.NumberFormat("en-AE", { maximumFractionDigits: 0 }).format(n);
 
-export default function PsqftChart({ buy, rent, listingBedrooms, listingPsqft }: Props) {
+export default function PsqftChart({ buy, rent, listingBedrooms, listingSizeSqft, listingPsqft }: Props) {
   const [mode, setMode] = useState<"buy" | "rent">("buy");
   const [hover, setHover] = useState<{ p: Pt; x: number; y: number } | null>(null);
 
@@ -64,11 +67,15 @@ export default function PsqftChart({ buy, rent, listingBedrooms, listingPsqft }:
           bedrooms: r.bedrooms,
           amount: r.amount,
           size: r.size_sqft,
-          comparable: listingBedrooms != null && r.bedrooms === listingBedrooms,
+          // Same criterion as the yield sample: similar size first, bedrooms fallback.
+          comparable:
+            listingSizeSqft != null
+              ? Math.abs((r.size_sqft as number) - listingSizeSqft) / listingSizeSqft <= SIZE_TOLERANCE
+              : listingBedrooms != null && r.bedrooms === listingBedrooms,
         }))
         .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.y))
         .sort((a, b) => a.t - b.t),
-    [rows, listingBedrooms]
+    [rows, listingBedrooms, listingSizeSqft]
   );
 
   const scales = useMemo(() => {
@@ -271,7 +278,7 @@ export default function PsqftChart({ buy, rent, listingBedrooms, listingPsqft }:
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-neutral-500">
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: ACCENT }} />
-              Mismo nº de habitaciones ({compCount})
+              {listingSizeSqft != null ? "Tamaño similar (±20%)" : "Mismo nº de habitaciones"} ({compCount})
             </span>
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-2.5 w-2.5 rounded-full border-[1.5px]" style={{ borderColor: MUTED }} />

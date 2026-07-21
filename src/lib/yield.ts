@@ -5,16 +5,21 @@ const WINDOW_MS = 24 * 30.44 * 24 * 3600 * 1000; // ~24 months
 const MIN_SAMPLES = 3;
 const SIZE_TOLERANCE = 0.2;
 
-function median(xs: number[]): number | null {
+function percentile(xs: number[], p: number): number | null {
   if (xs.length === 0) return null;
   const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  const idx = (s.length - 1) * p;
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  return lo === hi ? s[lo] : s[lo] + (s[hi] - s[lo]) * (idx - lo);
 }
 
+const median = (xs: number[]) => percentile(xs, 0.5);
+
 /**
- * Comparable units only: same bedrooms + similar size when possible, relaxing to
- * same bedrooms, then similar size. Never falls back to "every transaction in the
+ * Comparable units: SIMILAR SIZE (±20%) is the primary criterion, refined by same
+ * bedroom count when that still leaves a usable sample. Bedrooms-only is a last
+ * resort for listings with no size. Never falls back to "every transaction in the
  * building" — mixing unit types is what produces bogus yields.
  */
 function pickSample(txs: TxRow[], bedrooms: number | null, sizeSqft: number | null): TxRow[] {
@@ -24,16 +29,14 @@ function pickSample(txs: TxRow[], bedrooms: number | null, sizeSqft: number | nu
   const sameSize = (t: TxRow) =>
     sizeSqft != null && t.size_sqft != null && Math.abs(t.size_sqft - sizeSqft) / sizeSqft <= SIZE_TOLERANCE;
 
-  const byBoth = recent.filter((t) => sameBdr(t) && sameSize(t));
-  if (byBoth.length >= MIN_SAMPLES) return byBoth;
-  const byBdr = recent.filter(sameBdr);
-  if (byBdr.length >= MIN_SAMPLES) return byBdr;
+  const bySizeAndBdr = recent.filter((t) => sameSize(t) && sameBdr(t));
+  if (bySizeAndBdr.length >= MIN_SAMPLES) return bySizeAndBdr;
   const bySize = recent.filter(sameSize);
   if (bySize.length >= MIN_SAMPLES) return bySize;
-  // Below MIN_SAMPLES everywhere: use the best comparable set we have, even if tiny.
-  if (byBoth.length) return byBoth;
-  if (byBdr.length) return byBdr;
-  return bySize;
+  // Below MIN_SAMPLES everywhere: best comparable set we have, even if tiny.
+  if (bySizeAndBdr.length) return bySizeAndBdr;
+  if (bySize.length) return bySize;
+  return recent.filter(sameBdr); // only reachable when the listing has no size
 }
 
 /**
@@ -52,14 +55,22 @@ export function computeYield(
   const buySample = pickSample(buyTxs, bedrooms, sizeSqft);
   const rentSample = pickSample(rentTxs, bedrooms, sizeSqft);
 
-  const medianRent = median(rentSample.map((t) => t.amount));
-  const medianSalePrice = median(buySample.map((t) => t.amount));
+  const rents = rentSample.map((t) => t.amount);
+  const sales = buySample.map((t) => t.amount);
+  const medianRent = median(rents);
+  const medianSalePrice = median(sales);
 
   return {
     gross_yield: medianRent != null && medianSalePrice ? medianRent / medianSalePrice : null,
     asking_yield: medianRent != null && price > 0 ? medianRent / price : null,
     median_rent: medianRent,
     median_sale_price: medianSalePrice,
+    // Spread of comparable rents/sales: within one building + size band the location
+    // is fixed, so the P25→P75 range mostly reflects interior condition/furnishing.
+    rent_p25: percentile(rents, 0.25),
+    rent_p75: percentile(rents, 0.75),
+    sale_p25: percentile(sales, 0.25),
+    sale_p75: percentile(sales, 0.75),
     rent_n: rentSample.length,
     buy_n: buySample.length,
   };

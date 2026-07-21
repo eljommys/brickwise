@@ -134,8 +134,15 @@ export function getDb(): Database.Database {
 
 function migrate(db: Database.Database) {
   const cols = (db.prepare(`PRAGMA table_info(analyses)`).all() as { name: string }[]).map((c) => c.name);
-  if (!cols.includes("median_sale_price")) db.exec(`ALTER TABLE analyses ADD COLUMN median_sale_price REAL`);
-  if (!cols.includes("asking_yield")) db.exec(`ALTER TABLE analyses ADD COLUMN asking_yield REAL`);
+  const add = (name: string) => {
+    if (!cols.includes(name)) db.exec(`ALTER TABLE analyses ADD COLUMN ${name} REAL`);
+  };
+  add("median_sale_price");
+  add("asking_yield");
+  add("rent_p25");
+  add("rent_p75");
+  add("sale_p25");
+  add("sale_p75");
 }
 
 export function now(): string {

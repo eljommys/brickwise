@@ -105,6 +105,10 @@ export interface AnalysisRow {
   asking_yield: number | null;
   median_rent: number | null;
   median_sale_price: number | null;
+  rent_p25: number | null;
+  rent_p75: number | null;
+  sale_p25: number | null;
+  sale_p75: number | null;
   rent_n: number;
   buy_n: number;
   gym_distance_m: number | null;
@@ -117,6 +121,10 @@ export interface YieldResult {
   asking_yield: number | null;
   median_rent: number | null;
   median_sale_price: number | null;
+  rent_p25: number | null;
+  rent_p75: number | null;
+  sale_p25: number | null;
+  sale_p75: number | null;
   rent_n: number;
   buy_n: number;
 }
