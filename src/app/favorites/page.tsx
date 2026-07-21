@@ -154,6 +154,7 @@ export default function FavoritesMapPage() {
   const [heatKind, setHeatKind] = useState<"rent" | "buy" | null>(null);
   const [heatLoading, setHeatLoading] = useState<"rent" | "buy" | null>(null);
   const [heatMax, setHeatMax] = useState<number | null>(null);
+  const [heatError, setHeatError] = useState<string | null>(null);
   const [showLayers, setShowLayers] = useState(false);
   const [sortBy, setSortBy] = useState<"yield" | "price">("yield");
   const [bedFilter, setBedFilter] = useState<number[]>([]);
@@ -513,11 +514,14 @@ export default function FavoritesMapPage() {
       heatLayerRef.current = null;
     }
     setHeatLoading(kind);
+    setHeatError(null);
     try {
       const res = await fetch(`/api/liquidity?kind=${kind}`);
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
-      await import("leaflet.heat"); // patches L.heatLayer
+      await import("leaflet.heat").catch(() => {
+        throw new Error("Falta la dependencia del mapa de calor. Cierra la app y vuelve a arrancarla para que se instale.");
+      }); // patches L.heatLayer
       const max = j.max || 1;
       setHeatMax(j.max ?? null);
       // Each favorite blooms proportionally to its tower's recent activity; a small
@@ -541,8 +545,9 @@ export default function FavoritesMapPage() {
       layer.addTo(map);
       heatLayerRef.current = layer;
       setHeatKind(kind);
-    } catch {
+    } catch (e) {
       setHeatKind(null);
+      setHeatError((e as Error).message || "No se pudo cargar el mapa de calor.");
     } finally {
       setHeatLoading(null);
     }
@@ -769,6 +774,9 @@ export default function FavoritesMapPage() {
                       <p className="px-2 pb-1 pt-0.5 text-[10px] leading-tight text-neutral-500">
                         {heatKind === "rent" ? "Contratos de alquiler" : "Ventas"} (DLD) por edificio, últimos 12 meses. Amarillo = poco líquido, morado = mucha actividad.
                       </p>
+                    )}
+                    {heatError && (
+                      <p className="px-2 pb-1 pt-0.5 text-[10px] leading-tight text-red-600 dark:text-red-400">{heatError}</p>
                     )}
                   </div>
                 )}

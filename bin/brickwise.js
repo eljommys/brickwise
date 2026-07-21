@@ -74,9 +74,38 @@ function openBrowser(url) {
     syncSources();
   }
 
-  if (!fs.existsSync(path.join(workdir, "node_modules", "next"))) {
-    step("Instalando dependencias (solo la primera vez, ~1 min)…");
+  // Reinstall deps on a fresh copy AND whenever the app version changed — an
+  // update can add dependencies (e.g. leaflet.heat), and node_modules is not
+  // copied over, so a stale install would be missing them. A version marker
+  // inside node_modules tells us what was last installed there.
+  const marker = path.join(workdir, "node_modules", ".brickwise-version");
+  const currentVer = (() => {
+    try {
+      return require(path.join(workdir, "package.json")).version || "";
+    } catch {
+      return "";
+    }
+  })();
+  const installedVer = (() => {
+    try {
+      return fs.readFileSync(marker, "utf8").trim();
+    } catch {
+      return null;
+    }
+  })();
+  const nextMissing = !fs.existsSync(path.join(workdir, "node_modules", "next"));
+  if (nextMissing || installedVer !== currentVer) {
+    step(
+      nextMissing
+        ? "Instalando dependencias (solo la primera vez, ~1 min)…"
+        : "Actualizando dependencias tras la actualización…"
+    );
     run(npm, ["install", "--include=dev", "--no-audit", "--no-fund"], workdir);
+    try {
+      fs.writeFileSync(marker, currentVer);
+    } catch {
+      /* non-fatal: worst case we reinstall next launch */
+    }
   }
 
   const port = await findFreePort(Number(process.env.PORT) || 3000);
