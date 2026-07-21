@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import YieldBadge from "@/components/YieldBadge";
 import TransactionsTable from "@/components/TransactionsTable";
 import PsqftChart from "@/components/PsqftChart";
@@ -8,6 +8,7 @@ import ReformScenario from "@/components/ReformScenario";
 import { fmtAED, fmtDist, fmtPct, fmtSqft } from "@/lib/format";
 import { AnalysisRow } from "@/lib/types";
 import { TxRow } from "@/lib/pf/transactions";
+import { discountVsTrend, psqftTrend } from "@/lib/trend";
 
 interface Detail {
   listing: {
@@ -55,6 +56,15 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
       })
       .catch((e) => setError(e.message));
   }, [id]);
+
+  // Discount of the asking price vs the sale trend (same trend line as the chart).
+  const discount = useMemo(() => {
+    if (!data) return null;
+    const { listing, transactions } = data;
+    const trend = psqftTrend(transactions?.buy ?? [], listing.size_sqft, listing.bedrooms);
+    const askingPsqft = listing.size_sqft ? listing.price / listing.size_sqft : null;
+    return discountVsTrend(trend, askingPsqft);
+  }, [data]);
 
   if (error)
     return (
@@ -143,11 +153,20 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
       <section>
         <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-neutral-500">Datos básicos</h2>
         <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-          <p className="flex items-baseline gap-2">
+          <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="text-3xl font-bold" style={{ color: "var(--accent)" }}>{fmtAED(listing.price)}</span>
             {listing.size_sqft ? (
               <span className="text-sm text-neutral-500">· {Math.round(listing.price / listing.size_sqft)} AED/sqft</span>
             ) : null}
+            {discount != null && (
+              <span
+                className="btn-font ml-1 self-center rounded px-2 py-0.5 text-[11px] font-bold text-white"
+                style={{ background: discount >= 0 ? "#059669" : "#dc2626" }}
+                title="Precio del anuncio frente a la tendencia de AED/sqft de ventas comparables del edificio"
+              >
+                {discount >= 0 ? "▼" : "▲"} {Math.abs(discount * 100).toFixed(0)}% {discount >= 0 ? "bajo tendencia" : "sobre tendencia"}
+              </span>
+            )}
           </p>
           <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
             <Fact label="Superficie" value={fmtSqft(listing.size_sqft)} />
@@ -267,6 +286,10 @@ const ANALYSIS_HELP: { term: string; desc: string }[] = [
   {
     term: "Rentabilidad sobre el precio del anuncio",
     desc: "Renta anual mediana ÷ el precio que pide ESTE anuncio. Indica si este piso, a su precio, rinde por encima o por debajo de la mediana del edificio.",
+  },
+  {
+    term: "Descuento vs tendencia",
+    desc: "AED/sqft del anuncio frente a la línea de tendencia de ventas comparables (la misma del gráfico), evaluada en la fecha más reciente. Verde = por debajo de la tendencia (descuento); rojo = por encima (sobreprecio).",
   },
   {
     term: "Gimnasio más cercano",
