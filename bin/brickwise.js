@@ -50,16 +50,12 @@ function openBrowser(url) {
 }
 
 (async () => {
-  const needBuild = !has(".next", "BUILD_ID");
-
-  if (!has("node_modules", "next") || (needBuild && !has("node_modules", "typescript"))) {
-    step("Instalando dependencias (solo la primera vez)…");
+  // Install deps if missing. We run the app with `next dev`, which compiles on
+  // demand and needs no separate production build — the most reliable path for a
+  // one-command local launch.
+  if (!has("node_modules", "next") || !has("node_modules", "typescript")) {
+    step("Instalando dependencias (solo la primera vez, ~1 min)…");
     run(npm, ["install", "--include=dev", "--no-audit", "--no-fund"]);
-  }
-
-  if (needBuild) {
-    step("Compilando la app (solo la primera vez, ~1 min)…");
-    run(npm, ["run", "build"]);
   }
 
   const port = await findFreePort(Number(process.env.PORT) || 3000);
@@ -68,7 +64,7 @@ function openBrowser(url) {
   step(`Arrancando Brickwise en ${url}`);
   console.log("  (Ctrl+C para parar · tus datos se guardan en ~/.brickwise/brickwise.db)\n");
 
-  const child = spawn(npm, ["run", "start", "--", "-p", String(port)], {
+  const child = spawn(npm, ["run", "dev", "--", "-p", String(port)], {
     cwd: root,
     stdio: "inherit",
     shell: isWin,

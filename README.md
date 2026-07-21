@@ -11,9 +11,8 @@ tener [Node.js](https://nodejs.org) 18.18+ instalado.
 npx github:eljommys/brickwise
 ```
 
-Eso es todo: **instala las dependencias, compila y arranca** la primera vez (~1-2 min), luego abre
-`http://localhost:3000` en tu navegador. Las siguientes veces arranca al instante. No hay nada más
-que configurar.
+Eso es todo: **instala las dependencias y arranca** (la primera vez tarda ~1 min instalando),
+elige un puerto libre y abre la app en tu navegador. No hay nada más que configurar.
 
 <details>
 <summary>¿Prefieres clonarlo?</summary>
@@ -21,8 +20,8 @@ que configurar.
 ```bash
 git clone https://github.com/eljommys/brickwise.git
 cd brickwise
-npm run app      # compila y arranca (uso normal)
-# o  npm run dev  para desarrollo con recarga en caliente
+npm install
+npm run dev      # → http://localhost:3000
 ```
 </details>
 
