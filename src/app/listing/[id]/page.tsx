@@ -83,6 +83,12 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
           {listing.tower_name} · {listing.bedrooms === 0 ? "Studio" : `${listing.bedrooms ?? "?"} hab`} ·{" "}
           {listing.bathrooms ?? "?"} baños · {fmtSqft(listing.size_sqft)} · {listing.property_type}
         </p>
+        <p className="mt-2 flex items-baseline gap-2">
+          <span className="text-3xl font-bold" style={{ color: "var(--accent)" }}>{fmtAED(listing.price)}</span>
+          {listing.size_sqft ? (
+            <span className="text-sm text-neutral-500">· {Math.round(listing.price / listing.size_sqft)} AED/sqft</span>
+          ) : null}
+        </p>
         <div className="mt-1 flex items-center gap-4">
           <a
             href={listing.url}
