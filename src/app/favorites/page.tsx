@@ -371,9 +371,10 @@ export default function FavoritesMapPage() {
     for (const p of items) {
       const icon = L.divIcon({ className: "", html: `<div class="${cssClass}">${svg}</div>`, iconSize: [0, 0], iconAnchor: [0, 0] });
       const safeName = p.name.replace(/[<>&"]/g, (c) => `&#${c.charCodeAt(0)};`);
-      // Name + coordinates: Google resolves the actual business (not a bare pin), and the
-      // coordinates anchor the search to Dubai so it isn't biased to the viewer's location.
-      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.name} ${p.lat},${p.lon}`)}`;
+      // Business name in the query, exact spot in the /@lat,lon path (not the query text):
+      // a named POI opens its own Maps place card; the coordinates never clutter the search
+      // box and only bias the map to Dubai so the right branch/spot is what's shown.
+      const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(p.name)}/@${p.lat},${p.lon},17z`;
       L.marker([p.lat, p.lon], { icon })
         .bindPopup(
           `<b>${safeName}</b><br><a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" style="font-size:12px">Ver en Google Maps ↗</a>`,
