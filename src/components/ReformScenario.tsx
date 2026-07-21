@@ -14,6 +14,28 @@ interface Props {
   analysis: AnalysisRow;
 }
 
+const REFORM_HELP =
+  "Comparamos los alquileres de pisos de TAMAÑO SIMILAR (±20%) del mismo edificio (24 meses). " +
+  "P25 = lo que se alquila un piso sin reformar; P75 = uno bien reformado; mediana = el típico. " +
+  "La “dispersión” = (P75 − P25) ÷ mediana mide cuánto varían las rentas según el estado interior: " +
+  "≥15% el interior manda (hay margen para que la reforma suba el alquiler); 8–15% margen moderado; " +
+  "<8% el edificio “capa” la renta y la reforma no se paga. La barra verde es el margen de subida que " +
+  "capta la reforma: de la renta típica (mediana) hasta el P75.";
+
+/** Small "?" badge with a hover tooltip. */
+function InfoTip({ text }: { text: string }) {
+  return (
+    <span className="group relative ml-1 inline-flex align-middle normal-case">
+      <span className="flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-neutral-400 text-[10px] font-bold text-neutral-500 dark:border-neutral-500">
+        ?
+      </span>
+      <span className="pointer-events-none absolute left-0 top-5 z-30 w-72 rounded-md border border-neutral-200 bg-white p-2.5 text-[11px] font-normal leading-snug text-neutral-600 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+        {text}
+      </span>
+    </span>
+  );
+}
+
 /**
  * Buy → light reform → rent higher. Within one building + size band the location
  * is fixed, so the comparable-rent spread (P25→P75) approximates what the market
@@ -39,6 +61,10 @@ export default function ReformScenario({ listingId, price, sizeSqft, analysis }:
   const uplift = rent_p75 - median_rent;
   const paybackYears = uplift > 0 ? cost / uplift : null;
   const spread = (rent_p75 - rent_p25) / median_rent;
+  const medianPct =
+    rent_p75 > rent_p25
+      ? Math.min(96, Math.max(4, ((median_rent - rent_p25) / (rent_p75 - rent_p25)) * 100))
+      : 50;
 
   const spreadReading =
     spread >= 0.15
@@ -54,7 +80,8 @@ export default function ReformScenario({ listingId, price, sizeSqft, analysis }:
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
       <h3 className="text-sm font-bold">
-        Escenario de reforma{" "}
+        Escenario de reforma
+        <InfoTip text={REFORM_HELP} />{" "}
         <span className="font-normal text-neutral-500">
           ({rent_n} alquileres comparables{band ? ` · ${band}` : ""})
         </span>
@@ -68,19 +95,32 @@ export default function ReformScenario({ listingId, price, sizeSqft, analysis }:
             <span>mediana</span>
             <span>P75 (reformado)</span>
           </div>
-          <div className="relative h-2 rounded-full bg-gradient-to-r from-red-300 via-amber-300 to-emerald-400 dark:from-red-900 dark:via-amber-700 dark:to-emerald-600">
+          <div className="relative h-2.5 rounded-full bg-neutral-200 dark:bg-neutral-800">
             {rent_p75 > rent_p25 && (
-              <span
-                className="absolute -top-1 h-4 w-1 rounded bg-neutral-900 dark:bg-white"
-                style={{ left: `${Math.min(99, Math.max(1, ((median_rent - rent_p25) / (rent_p75 - rent_p25)) * 100))}%` }}
-                title={`mediana ${fmtAED(median_rent)}`}
-              />
+              <>
+                {/* upside captured by reforming: median → P75 */}
+                <div
+                  className="absolute inset-y-0 right-0 rounded-r-full bg-emerald-400 dark:bg-emerald-600"
+                  style={{ left: `${medianPct}%` }}
+                  title="Margen de reforma: de la renta típica al P75"
+                />
+                {/* median tick */}
+                <span
+                  className="absolute -top-[3px] h-[17px] w-[3px] -translate-x-1/2 rounded bg-neutral-900 dark:bg-white"
+                  style={{ left: `${medianPct}%` }}
+                  title={`mediana ${fmtAED(median_rent)}`}
+                />
+              </>
             )}
           </div>
-          <div className="mt-1 flex justify-between text-xs font-semibold">
+          <div className="mt-1.5 flex justify-between text-xs font-semibold">
             <span>{fmtAED(rent_p25)}</span>
             <span className="text-neutral-500">{fmtAED(median_rent)}</span>
             <span>{fmtAED(rent_p75)}</span>
+          </div>
+          <div className="mt-1 flex items-center gap-1.5 text-[10px] text-neutral-500">
+            <span className="inline-block h-2 w-3 rounded-sm bg-emerald-400 dark:bg-emerald-600" />
+            margen de reforma (mediana → P75)
           </div>
           <p className={`mt-2 text-xs ${spreadReading.cls}`}>
             Dispersión {fmtPct(spread, 0)} de la mediana — {spreadReading.txt}
