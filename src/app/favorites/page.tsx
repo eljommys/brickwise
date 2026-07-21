@@ -38,27 +38,19 @@ function matchesBedFilter(r: { bedrooms: number | null }, bedFilter: number[]): 
   return bedFilter.length === 0 || (r.bedrooms != null && bedFilter.includes(r.bedrooms));
 }
 
-/**
- * Relative color scale: red (lowest yield in the set) → turquoise (highest).
- * Absolute thresholds made every Dubai listing green because yields are all high;
- * scaling to the actual min/max makes the differences readable on the map.
- */
-function yieldColor(y: number | null, min: number, max: number): string {
+// Yield color anchors: ≤6% red (mediocre) → 10%+ turquoise (espectacular),
+// with 8–9% around the green middle (bueno).
+const YIELD_LOW = 0.06;
+const YIELD_HIGH = 0.1;
+
+function yieldColor(y: number | null): string {
   if (y == null) return "#8a8a8a";
-  const t = max > min ? Math.min(1, Math.max(0, (y - min) / (max - min))) : 0.5;
+  const t = Math.min(1, Math.max(0, (y - YIELD_LOW) / (YIELD_HIGH - YIELD_LOW)));
   const hue = t * 174; // 0° red → 174° turquoise
   return `hsl(${Math.round(hue)}, 66%, 44%)`;
 }
 
-/** Min/max of the located favorites' yields, for the relative color scale. */
-function yieldRange(rows: FavRow[] | null): { min: number; max: number } {
-  const ys = (rows ?? [])
-    .filter((r) => r.lat != null && r.lon != null && r.gross_yield != null)
-    .map((r) => r.gross_yield as number);
-  return ys.length ? { min: Math.min(...ys), max: Math.max(...ys) } : { min: 0, max: 1 };
-}
-
-function popupHtml(r: FavRow, min: number, max: number): string {
+function popupHtml(r: FavRow): string {
   const img = r.images?.[0]?.medium || r.images?.[0]?.small;
   const yieldTxt = r.gross_yield != null ? (r.gross_yield * 100).toFixed(1) + " %" : "sin datos";
   return `
@@ -67,7 +59,7 @@ function popupHtml(r: FavRow, min: number, max: number): string {
       <div style="font-weight:600;margin-top:6px;line-height:1.3">${r.title}</div>
       <div style="color:#666;font-size:12px;margin-top:2px">${r.tower_name ?? ""}</div>
       <div style="margin-top:4px;font-size:14px">
-        Rentabilidad: <span style="color:${yieldColor(r.gross_yield, min, max)};font-weight:700">${yieldTxt}</span>
+        Rentabilidad: <span style="color:${yieldColor(r.gross_yield)};font-weight:700">${yieldTxt}</span>
       </div>
       <div style="margin-top:6px;display:flex;gap:10px;font-size:12px">
         <a href="/listing/${r.id}">Ver análisis</a>
@@ -205,20 +197,19 @@ export default function FavoritesMapPage() {
     if (!L || !map || !mapReady || !rows) return;
     Object.values(markersRef.current).forEach((m) => m.remove());
     markersRef.current = {};
-    const { min, max } = yieldRange(rows);
     const bounds: [number, number][] = [];
     for (const r of rows) {
       if (r.lat == null || r.lon == null) continue;
       const y = r.gross_yield != null ? (r.gross_yield * 100).toFixed(1) + "%" : "—";
       const icon = L.divIcon({
         className: "",
-        html: `<div class="bw-pin" style="--pin-color:${yieldColor(r.gross_yield, min, max)}"><div class="bw-pin-label">${y}</div><div class="bw-pin-tail"></div></div>`,
+        html: `<div class="bw-pin" style="--pin-color:${yieldColor(r.gross_yield)}"><div class="bw-pin-label">${y}</div><div class="bw-pin-tail"></div></div>`,
         iconSize: [0, 0],
         iconAnchor: [0, 0],
       });
       const marker = L.marker([r.lat, r.lon], { icon })
         .addTo(map)
-        .bindPopup(popupHtml(r, min, max), { maxWidth: 260, offset: [0, -34] });
+        .bindPopup(popupHtml(r), { maxWidth: 260, offset: [0, -34] });
       marker.on("mouseover", () => {
         setHoveredId(r.id);
         document.getElementById(`fav-${r.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -521,11 +512,11 @@ export default function FavoritesMapPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-2 flex flex-col gap-1.5">
               <button
                 type="submit"
                 disabled={!input.trim() || busy}
-                className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-500 disabled:opacity-50"
+                className="w-full rounded-lg bg-blue-600 py-2 text-xs font-bold text-white hover:bg-blue-500 disabled:opacity-50"
               >
                 {busy ? `Analizando ${queue.length}…` : "Añadir y analizar"}
               </button>
@@ -533,7 +524,7 @@ export default function FavoritesMapPage() {
                 type="button"
                 onClick={toggleGyms}
                 disabled={gymsLoading || (rows?.length ?? 0) === 0}
-                className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-semibold hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                className="w-full rounded-lg border border-neutral-300 py-2 text-xs font-semibold hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
               >
                 {gymsLoading
                   ? "Buscando…"
@@ -546,7 +537,7 @@ export default function FavoritesMapPage() {
               <button
                 type="button"
                 onClick={() => setShowSync((v) => !v)}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+                className={`w-full rounded-lg border py-2 text-xs font-semibold ${
                   showSync
                     ? "border-blue-500 text-blue-600 dark:text-blue-400"
                     : "border-neutral-300 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
@@ -682,23 +673,23 @@ export default function FavoritesMapPage() {
       {/* ------------------------------------------------ map */}
       <div className="relative min-h-0 min-w-0 flex-1">
         <div ref={containerRef} className="absolute inset-0" />
-        {(() => {
-          const { min, max } = yieldRange(rows);
-          if (!(max > min)) return null;
-          return (
-            <div className="pointer-events-none absolute bottom-4 left-3 z-[500] rounded border border-black/10 bg-white/90 px-2 py-1.5 text-[10px] text-neutral-700 shadow-lg dark:border-white/10 dark:bg-neutral-900/90 dark:text-neutral-200">
-              <div className="btn-font mb-1 text-[9px] text-neutral-500">Rentabilidad</div>
-              <div className="flex items-center gap-1.5">
-                <span>{(min * 100).toFixed(1)}%</span>
-                <span
-                  className="h-2 w-24 rounded-sm"
-                  style={{ background: `linear-gradient(90deg, hsl(0,66%,44%), hsl(87,66%,44%), hsl(174,66%,44%))` }}
-                />
-                <span>{(max * 100).toFixed(1)}%</span>
-              </div>
-            </div>
-          );
-        })()}
+        <div className="pointer-events-none absolute bottom-4 left-3 z-[500] rounded border border-black/10 bg-white/90 px-2.5 py-2 text-neutral-700 shadow-lg dark:border-white/10 dark:bg-neutral-900/90 dark:text-neutral-200">
+          <div className="btn-font mb-1 text-[9px] text-neutral-500">Rentabilidad anual</div>
+          <div
+            className="h-2 w-52 rounded-sm"
+            style={{ background: "linear-gradient(90deg, hsl(0,66%,44%), hsl(87,66%,44%), hsl(174,66%,44%))" }}
+          />
+          <div className="mt-1 flex w-52 justify-between text-[10px] font-semibold">
+            <span>Mediocre</span>
+            <span>Bueno</span>
+            <span>Espectacular</span>
+          </div>
+          <div className="flex w-52 justify-between text-[9px] text-neutral-500">
+            <span>≤6%</span>
+            <span>8–9%</span>
+            <span>10%+</span>
+          </div>
+        </div>
       </div>
     </div>
   );
