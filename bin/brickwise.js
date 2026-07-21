@@ -4,30 +4,45 @@
 
 // Zero-config launcher for Brickwise.
 // Run directly (`npx github:eljommys/brickwise`) or after cloning (`node bin/brickwise.js`).
-// It installs dependencies if missing, builds once, then starts the local server.
+//
+// npx installs the package nested under ~/.npm/_npx/<hash>/ next to its own
+// lockfile, which confuses Next's workspace-root detection (breaking module
+// resolution and the bundler). To avoid that entirely we copy the app into a
+// clean, single-lockfile directory (~/.brickwise/app) and run it from there.
+// Data lives in ~/.brickwise/brickwise.db, independent of the app copy.
 
 const { spawnSync, spawn } = require("child_process");
 const fs = require("fs");
 const net = require("net");
+const os = require("os");
 const path = require("path");
 
-const root = path.resolve(__dirname, "..");
 const isWin = process.platform === "win32";
 const npm = isWin ? "npm.cmd" : "npm";
+const pkgDir = path.resolve(__dirname, "..");
+const APP = path.join(os.homedir(), ".brickwise", "app");
 
 function step(msg) {
   process.stdout.write(`\n\x1b[1m\x1b[34m▸ ${msg}\x1b[0m\n`);
 }
 
-function run(cmd, args) {
-  const r = spawnSync(cmd, args, { cwd: root, stdio: "inherit", shell: isWin });
+function run(cmd, args, cwd) {
+  const r = spawnSync(cmd, args, { cwd, stdio: "inherit", shell: isWin });
   if (r.status !== 0) {
     console.error(`\n\x1b[31m✖ Falló: ${cmd} ${args.join(" ")}\x1b[0m`);
     process.exit(r.status || 1);
   }
 }
 
-const has = (...p) => fs.existsSync(path.join(root, ...p));
+const EXCLUDE = /(^|[\/\\])(node_modules|\.next|\.git|brickwise\.db)/;
+
+function syncSources() {
+  fs.mkdirSync(APP, { recursive: true });
+  fs.cpSync(pkgDir, APP, {
+    recursive: true,
+    filter: (src) => !EXCLUDE.test(path.relative(pkgDir, src)),
+  });
+}
 
 function findFreePort(start) {
   return new Promise((resolve) => {
@@ -50,12 +65,18 @@ function openBrowser(url) {
 }
 
 (async () => {
-  // Install deps if missing. We run the app with `next dev`, which compiles on
-  // demand and needs no separate production build — the most reliable path for a
-  // one-command local launch.
-  if (!has("node_modules", "next") || !has("node_modules", "typescript")) {
+  // If already launched from inside the clean copy, run in place; otherwise sync.
+  const inPlace = path.resolve(pkgDir) === path.resolve(APP);
+  const workdir = inPlace ? pkgDir : APP;
+
+  if (!inPlace) {
+    step("Preparando la app…");
+    syncSources();
+  }
+
+  if (!fs.existsSync(path.join(workdir, "node_modules", "next"))) {
     step("Instalando dependencias (solo la primera vez, ~1 min)…");
-    run(npm, ["install", "--include=dev", "--no-audit", "--no-fund"]);
+    run(npm, ["install", "--include=dev", "--no-audit", "--no-fund"], workdir);
   }
 
   const port = await findFreePort(Number(process.env.PORT) || 3000);
@@ -65,7 +86,7 @@ function openBrowser(url) {
   console.log("  (Ctrl+C para parar · tus datos se guardan en ~/.brickwise/brickwise.db)\n");
 
   const child = spawn(npm, ["run", "dev", "--", "-p", String(port)], {
-    cwd: root,
+    cwd: workdir,
     stdio: "inherit",
     shell: isWin,
   });
