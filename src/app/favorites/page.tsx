@@ -77,6 +77,21 @@ const SAVED_URL = "https://www.propertyfinder.ae/en/user/saved-properties";
 // strips javascript: hrefs.
 const BOOKMARKLET = String.raw`javascript:(function(){var u=new Set();document.querySelectorAll('a[href]').forEach(function(a){var h=(a.href||'').split('?')[0];if(/\/plp\/.*-\d+\.html$/.test(h))u.add(h)});try{var n=document.getElementById('__NEXT_DATA__');if(n){(JSON.stringify(JSON.parse(n.textContent)).match(/https?:\/\/[^"']*\/plp\/[^"']*-\d+\.html/g)||[]).forEach(function(x){u.add(x.split('?')[0])})}}catch(e){}var l=[...u];if(!l.length){alert('No encontre pisos guardados aqui. Abre tu pagina de Guardados de Property Finder con la sesion iniciada.');return}var t=l.join('\n');if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){alert(l.length+' piso(s) copiados. Abre Brickwise y pulsa "Pegar de Property Finder".')},function(){prompt('Copia estos enlaces y pegalos en Brickwise:',t)})}else{prompt('Copia estos enlaces y pegalos en Brickwise:',t)}})();`;
 
+// leaflet.heat's radius is in screen pixels, so a fixed value shrinks in real-world
+// terms as you zoom in. Anchor the radius to a reference zoom and scale by 2^(Δzoom)
+// (each zoom level doubles pixels-per-meter) so the geographic influence stays constant.
+const HEAT_REF_ZOOM = 12;
+const HEAT_REF_RADIUS = 40;
+const HEAT_REF_BLUR = 22;
+function heatRadiusForZoom(zoom: number): { radius: number; blur: number } {
+  const scale = Math.pow(2, zoom - HEAT_REF_ZOOM);
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+  return {
+    radius: clamp(HEAT_REF_RADIUS * scale, 6, 900),
+    blur: clamp(HEAT_REF_BLUR * scale, 4, 500),
+  };
+}
+
 function LayerToggle({
   label,
   color,
@@ -209,6 +224,16 @@ export default function FavoritesMapPage() {
       };
       el.addEventListener("wheel", onWheel, { passive: false });
       map.on("remove", () => el.removeEventListener("wheel", onWheel));
+
+      // Keep the heat influence constant in real-world size across zoom levels:
+      // rescale the pixel radius whenever the zoom settles.
+      map.on("zoomend", () => {
+        const layer = heatLayerRef.current as unknown as {
+          setOptions?: (o: Record<string, unknown>) => void;
+        } | null;
+        if (!layer?.setOptions) return;
+        layer.setOptions(heatRadiusForZoom(map.getZoom()));
+      });
       let tries = 0;
       const timer = setInterval(() => {
         tries++;
@@ -504,9 +529,10 @@ export default function FavoritesMapPage() {
       const Lmod = leafletRef.current as unknown as { heatLayer?: HeatFn; default?: { heatLayer?: HeatFn } };
       const heatLayer = Lmod.heatLayer ?? Lmod.default?.heatLayer;
       if (!heatLayer) throw new Error("plugin de calor no disponible");
+      const { radius, blur } = heatRadiusForZoom(map.getZoom());
       const layer = heatLayer(pts, {
-        radius: 40,
-        blur: 22,
+        radius,
+        blur,
         max: 1,
         minOpacity: 0.55,
         // Yellow (low) → purple (high).
