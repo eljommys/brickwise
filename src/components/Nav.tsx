@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const ITEMS = [
-  { href: "/favorites", label: "⭐ Favoritos + Mapa" },
-  { href: "/", label: "📊 Analizados" },
+  { href: "/favorites", label: "Favoritos + Mapa" },
+  { href: "/", label: "Analizados" },
 ];
 
 export default function Nav() {
@@ -13,7 +13,7 @@ export default function Nav() {
   return (
     <nav className="mx-auto flex h-14 w-full max-w-[1800px] items-center gap-2 px-4">
       <Link href="/" className="font-brand mr-4 flex items-center gap-2 text-lg font-bold tracking-tight">
-        🧱 Brickwise
+        Brickwise
       </Link>
       {ITEMS.map((it) => {
         const active = it.href === "/" ? pathname === "/" : pathname.startsWith(it.href);

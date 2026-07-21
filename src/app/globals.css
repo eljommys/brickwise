@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ---- Local fonts (public/fonts) ------------------------------------- */
+/* ---- Local font (public/fonts) — titles only ------------------------ */
 
 @font-face {
   font-family: "Stack Sans Notch";
@@ -9,18 +9,13 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: "Mozilla Text";
-  src: url("/fonts/Mozilla_Text/MozillaText-VariableFont_wght.ttf") format("truetype");
-  font-weight: 200 700;
-  font-display: swap;
-}
-
 :root {
-  --background: #f4f3f1;
-  --foreground: #1c1e24;
+  --background: #f5f5f5;
+  --foreground: #202020;
   --font-title: "Stack Sans Notch", system-ui, sans-serif;
-  --font-button: "Mozilla Text", system-ui, sans-serif;
+  --font-button: var(--font-space-mono), ui-monospace, monospace;
+  --accent: #b84f30; /* ladrillo */
+  --accent-ink: #1a1208; /* texto casi negro sobre acento */
 }
 
 @theme inline {
@@ -31,11 +26,11 @@
 }
 
 @theme {
-  /* Slate-black neutrals (dark side) — negro pizarra, never pure black */
-  --color-neutral-950: #16181e;
-  --color-neutral-900: #1d2027;
-  --color-neutral-800: #282c36;
-  --color-neutral-700: #3a3f4c;
+  /* Neutral dark grays — gris muy oscuro, sin tinte azul */
+  --color-neutral-950: #232323;
+  --color-neutral-900: #333333;
+  --color-neutral-800: #424242;
+  --color-neutral-700: #545454;
 
   /* Brick accent — remaps every blue-* usage in the app to color ladrillo */
   --color-blue-50: #faeee8;
@@ -50,21 +45,21 @@
   --color-blue-900: #5a2718;
   --color-blue-950: #38180e;
 
-  /* Pixel-art: blocky corners everywhere */
+  /* Minimalist: mostly-sharp corners */
   --radius-xs: 0px;
   --radius-sm: 0px;
-  --radius-md: 2px;
+  --radius-md: 0px;
   --radius-lg: 2px;
   --radius-xl: 2px;
-  --radius-2xl: 3px;
-  --radius-3xl: 3px;
-  --radius-4xl: 3px;
+  --radius-2xl: 2px;
+  --radius-3xl: 2px;
+  --radius-4xl: 2px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #16181e; /* negro pizarra */
-    --foreground: #e8eaef;
+    --background: #2c2c2c; /* gris muy oscuro (44,44,44) */
+    --foreground: #ededed;
   }
 }
 
@@ -74,51 +69,50 @@ body {
   font-family: var(--font-montserrat), system-ui, sans-serif;
 }
 
-/* ---- Type roles ------------------------------------------------------ */
+/* ---- Type roles (base layer, so per-element utilities can override) --- */
 
-/* Titles (logo, headings) → Stack Sans Notch */
-h1,
-h2,
-h3,
-.font-brand {
-  font-family: var(--font-title);
-  letter-spacing: 0.015em;
+@layer base {
+  /* Titles (logo, headings) → Stack Sans Notch */
+  h1,
+  h2,
+  h3,
+  .font-brand {
+    font-family: var(--font-title);
+    letter-spacing: 0.01em;
+  }
+
+  /* Button text → Space Mono, uppercase, flat */
+  button,
+  .btn-font {
+    font-family: var(--font-button);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
 }
 
-/* Button text → Mozilla Text */
-button,
-.btn-font {
-  font-family: var(--font-button);
+/* Accent-background buttons → near-black ink (higher specificity than text-*) */
+button[class*="bg-blue-6"],
+button[class*="bg-blue-5"],
+.btn-font[class*="bg-blue-6"],
+.btn-font[class*="bg-blue-5"] {
+  color: var(--accent-ink);
 }
 
-/* ---- Pixel-art touches ----------------------------------------------- */
+/* ---- Minimalist: no hard/offset shadows ------------------------------ */
 
-/* Blocky pills/badges too */
+.shadow-sm,
+.shadow-md {
+  box-shadow: none;
+}
+.shadow-lg {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+}
 .rounded-full {
   border-radius: 2px;
 }
 
-/* Primary (brick) buttons: hard offset shadow + press-down */
-button[class*="bg-blue-600"],
-.btn-font[class*="bg-blue-600"] {
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
-}
-button[class*="bg-blue-600"]:active,
-.btn-font[class*="bg-blue-600"]:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.35);
-}
-
-/* Cards: crisp 1px edge, no soft blur shadows */
-.shadow-sm,
-.shadow-md,
-.shadow-lg {
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.18);
-}
-
 /* ---- Map markers ---------------------------------------------------- */
 
-/* Property pin: pill with the yield + a small tail; the tail tip sits on the latlng. */
 .bw-pin {
   display: flex;
   flex-direction: column;
@@ -130,40 +124,37 @@ button[class*="bg-blue-600"]:active,
   background: var(--pin-color, #737373);
   color: #fff;
   font: 700 11px/1 var(--font-button);
-  padding: 5px 9px;
+  padding: 4px 8px;
   border-radius: 2px;
-  border: 2px solid #fff;
-  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   white-space: nowrap;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 .bw-pin-tail {
   width: 0;
   height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-top: 7px solid #fff;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid rgba(255, 255, 255, 0.85);
   margin-top: -1px;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
 }
 .bw-pin--hl .bw-pin-label {
-  transform: scale(1.22);
-  box-shadow:
-    0 0 0 4px rgba(184, 79, 48, 0.55),
-    3px 3px 0 rgba(0, 0, 0, 0.4);
+  transform: scale(1.2);
+  box-shadow: 0 0 0 3px rgba(184, 79, 48, 0.6);
 }
 
 /* Gym marker: brick square with a white dumbbell. */
 .bw-gym {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 2px;
-  background: #b84f30;
-  border: 2px solid #fff;
+  background: var(--accent);
+  border: 1px solid rgba(255, 255, 255, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   transform: translate(-50%, -50%);
   cursor: pointer;
 }

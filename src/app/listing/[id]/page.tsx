@@ -97,7 +97,7 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
             disabled={faved}
             className="rounded-lg border border-neutral-300 px-3 py-1 text-sm font-medium hover:bg-neutral-100 disabled:opacity-60 dark:border-neutral-700 dark:hover:bg-neutral-800"
           >
-            {faved ? "⭐ Guardado" : "☆ Guardar en favoritos"}
+            {faved ? "Guardado" : "Guardar en favoritos"}
           </button>
         </div>
       </div>

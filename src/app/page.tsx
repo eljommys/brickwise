@@ -83,7 +83,7 @@ export default function Dashboard() {
         <div className="rounded-xl border border-dashed border-neutral-300 p-10 text-center text-neutral-500 dark:border-neutral-700">
           Aún no hay inmuebles analizados. Añade enlaces de Property Finder en{" "}
           <Link href="/favorites" className="font-semibold text-blue-600 hover:underline dark:text-blue-400">
-            ⭐ Favoritos + Mapa
+            Favoritos + Mapa
           </Link>
           .
         </div>

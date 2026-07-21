@@ -54,7 +54,7 @@ export default function ReformScenario({ listingId, price, sizeSqft, analysis }:
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
       <h3 className="text-sm font-bold">
-        🔨 Escenario de reforma{" "}
+        Escenario de reforma{" "}
         <span className="font-normal text-neutral-500">
           ({rent_n} alquileres comparables{band ? ` · ${band}` : ""})
         </span>

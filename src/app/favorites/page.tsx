@@ -327,7 +327,7 @@ export default function FavoritesMapPage() {
         const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${g.lat}%2C${g.lon}`;
         L.marker([g.lat, g.lon], { icon })
           .bindPopup(
-            `<b>🏋️ ${safeName}</b><br><a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" style="font-size:12px">Ver en Google Maps ↗</a>`,
+            `<b>${safeName}</b><br><a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" style="font-size:12px">Ver en Google Maps ↗</a>`,
             { offset: [0, -16] }
           )
           .addTo(layer);
@@ -378,11 +378,11 @@ export default function FavoritesMapPage() {
       >
         <div className="flex items-center gap-3 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
           <Link href="/" className="font-brand text-sm font-bold tracking-tight">
-            🧱 Brickwise
+            Brickwise
           </Link>
           <span className="ml-auto flex items-center gap-1 text-xs">
             <Link href="/" className="btn-font rounded-full px-2.5 py-1 font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800">
-              📊 Analizados
+              Analizados
             </Link>
           </span>
         </div>
@@ -400,7 +400,7 @@ export default function FavoritesMapPage() {
                 disabled={!input.trim() || busy}
                 className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-500 disabled:opacity-50"
               >
-                {busy ? `Analizando ${queue.length}…` : "＋ Añadir y analizar"}
+                {busy ? `Analizando ${queue.length}…` : "Añadir y analizar"}
               </button>
               <button
                 type="button"
@@ -412,9 +412,9 @@ export default function FavoritesMapPage() {
                   ? "Buscando…"
                   : gymCount != null
                     ? gymsVisible
-                      ? `🏋️ Ocultar (${gymCount})`
-                      : `🏋️ Mostrar (${gymCount})`
-                    : "🏋️ Gimnasios"}
+                      ? `Ocultar gyms (${gymCount})`
+                      : `Mostrar gyms (${gymCount})`
+                    : "Gimnasios"}
               </button>
               <button
                 type="button"
@@ -425,7 +425,7 @@ export default function FavoritesMapPage() {
                     : "border-neutral-300 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
                 }`}
               >
-                ⟳ Sincronizar con PF
+                Sincronizar con PF
               </button>
             </div>
             {errors.length > 0 && (
@@ -451,7 +451,7 @@ export default function FavoritesMapPage() {
                     className="mx-0.5 inline-block cursor-grab rounded bg-neutral-900 px-2 py-0.5 font-bold text-white dark:bg-white dark:text-neutral-900"
                     draggable
                   >
-                    📌 Guardados → Brickwise
+                    Guardados a Brickwise
                   </a>
                 </li>
                 <li>
@@ -468,7 +468,7 @@ export default function FavoritesMapPage() {
                     onClick={pasteFromPf}
                     className="rounded bg-blue-600 px-2 py-0.5 font-bold text-white hover:bg-blue-500"
                   >
-                    📋 Pegar de Property Finder
+                    Pegar de Property Finder
                   </button>
                 </li>
               </ol>
@@ -485,7 +485,7 @@ export default function FavoritesMapPage() {
             <p className="animate-pulse p-4 text-sm text-neutral-500">Cargando…</p>
           ) : rows.length === 0 ? (
             <p className="p-4 text-sm text-neutral-500">
-              No hay favoritos aún. Pega arriba un enlace de Property Finder o usa ⟳ Sincronizar con PF.
+              No hay favoritos aún. Pega arriba un enlace de Property Finder o usa Sincronizar con PF.
             </p>
           ) : (
             rows.map((r) => (
@@ -513,7 +513,7 @@ export default function FavoritesMapPage() {
                     <div className="flex items-start justify-between gap-2">
                       <button
                         onClick={() => focus(r)}
-                        className="line-clamp-1 text-left text-sm font-semibold hover:underline"
+                        className="line-clamp-1 text-left font-sans text-sm font-semibold normal-case tracking-normal hover:underline"
                         title="Centrar en el mapa"
                       >
                         {r.title}
