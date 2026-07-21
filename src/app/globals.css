@@ -26,11 +26,11 @@
 }
 
 @theme {
-  /* Neutral dark grays — gris muy oscuro, sin tinte azul */
-  --color-neutral-950: #232323;
-  --color-neutral-900: #333333;
-  --color-neutral-800: #424242;
-  --color-neutral-700: #545454;
+  /* Neutral dark grays anchored to the #2c2c2c (44,44,44) background */
+  --color-neutral-950: #242424; /* deep insets / header */
+  --color-neutral-900: #2c2c2c; /* panels & cards == background */
+  --color-neutral-800: #383838; /* borders, dividers, hover (subtle) */
+  --color-neutral-700: #4a4a4a;
 
   /* Brick accent — remaps every blue-* usage in the app to color ladrillo */
   --color-blue-50: #faeee8;
@@ -79,6 +79,12 @@ body {
   .font-brand {
     font-family: var(--font-title);
     letter-spacing: 0.01em;
+  }
+
+  /* Logo in uppercase */
+  .font-brand {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
 
   /* Button text → Space Mono, uppercase, flat */
@@ -142,6 +148,15 @@ button[class*="bg-blue-5"],
 .bw-pin--hl .bw-pin-label {
   transform: scale(1.2);
   box-shadow: 0 0 0 3px rgba(184, 79, 48, 0.6);
+}
+
+/* Filtered-out markers: darker + transparent */
+.bw-pin--dim {
+  opacity: 0.4;
+}
+.bw-pin--dim .bw-pin-label {
+  filter: grayscale(0.75) brightness(0.5);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 /* Gym marker: brick square with a white dumbbell. */

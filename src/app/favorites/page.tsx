@@ -34,6 +34,10 @@ interface FavRow {
 
 const GYM_SVG = `<svg viewBox="0 0 24 24" width="14" height="14" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M2 10h2v4H2zM5 8h2v8H5zM17 8h2v8h-2zM20 10h2v4h-2zM8 11h8v2H8z"/></svg>`;
 
+function matchesBedFilter(r: { bedrooms: number | null }, bedFilter: number[]): boolean {
+  return bedFilter.length === 0 || (r.bedrooms != null && bedFilter.includes(r.bedrooms));
+}
+
 function yieldColor(y: number | null): string {
   if (y == null) return "#737373";
   if (y >= 0.07) return "#059669";
@@ -88,6 +92,8 @@ export default function FavoritesMapPage() {
   const [gymsVisible, setGymsVisible] = useState(false);
   const [gymsLoading, setGymsLoading] = useState(false);
   const [gymCount, setGymCount] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<"yield" | "price">("yield");
+  const [bedFilter, setBedFilter] = useState<number[]>([]);
 
   const mapRef = useRef<LeafletMap | null>(null);
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
@@ -222,6 +228,16 @@ export default function FavoritesMapPage() {
       m.setZIndexOffset(id === hoveredId ? 1000 : 0);
     }
   }, [hoveredId]);
+
+  // --- Filter: dim (darker + transparent) the markers that don't match -----
+  useEffect(() => {
+    const byId = new Map((rows ?? []).map((r) => [r.id, r]));
+    for (const [id, m] of Object.entries(markersRef.current)) {
+      const r = byId.get(id);
+      const dim = !!r && !matchesBedFilter(r, bedFilter);
+      m.getElement()?.querySelector(".bw-pin")?.classList.toggle("bw-pin--dim", dim);
+    }
+  }, [bedFilter, rows, mapReady]);
 
   // --- Add-by-URL queue ----------------------------------------------------
   useEffect(() => {
@@ -368,6 +384,104 @@ export default function FavoritesMapPage() {
 
   const busy = queue.length > 0;
 
+  const sorted = [...(rows ?? [])].sort((a, b) =>
+    sortBy === "price"
+      ? a.price - b.price
+      : (b.gross_yield ?? -1) - (a.gross_yield ?? -1)
+  );
+  const visible = sorted.filter((r) => matchesBedFilter(r, bedFilter));
+  const dimmed = sorted.filter((r) => !matchesBedFilter(r, bedFilter));
+  const bedOptions = Array.from(
+    new Set((rows ?? []).map((r) => r.bedrooms).filter((b): b is number => b != null))
+  ).sort((a, b) => a - b);
+  const bedLabel = (b: number) => (b === 0 ? "Studio" : String(b));
+  const toggleBed = (b: number) =>
+    setBedFilter((prev) => (prev.includes(b) ? prev.filter((x) => x !== b) : [...prev, b]));
+
+  const renderCard = (r: FavRow, dim = false) => (
+    <div
+      key={r.id}
+      id={`fav-${r.id}`}
+      onMouseEnter={() => setHoveredId(r.id)}
+      onMouseLeave={() => setHoveredId(null)}
+      className={`border-b border-neutral-100 p-3 transition-colors dark:border-neutral-800 ${
+        hoveredId === r.id ? "bg-blue-50 dark:bg-neutral-800" : ""
+      } ${dim ? "opacity-40 grayscale" : ""}`}
+    >
+      <div className="flex gap-3">
+        {r.images?.[0] && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={r.images[0].small}
+            alt=""
+            onClick={() => focus(r)}
+            className="h-16 w-24 shrink-0 cursor-pointer rounded-lg object-cover"
+            loading="lazy"
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <button
+              onClick={() => focus(r)}
+              className="line-clamp-1 text-left font-sans text-sm font-semibold normal-case tracking-normal hover:underline"
+              title="Centrar en el mapa"
+            >
+              {r.title}
+            </button>
+            <button
+              onClick={() => remove(r.id)}
+              title="Quitar de favoritos"
+              className="shrink-0 rounded-md px-1.5 text-xs text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="truncate text-xs text-neutral-500">
+            {r.tower_name} · {r.bedrooms === 0 ? "Studio" : `${r.bedrooms ?? "?"} hab`} / {r.bathrooms ?? "?"} baños ·{" "}
+            {fmtSqft(r.size_sqft)}
+          </div>
+          <div className="mt-1 flex items-center gap-2">
+            <YieldBadge value={r.gross_yield} n={r.rent_n ?? undefined} />
+            {r.asking_yield != null && (
+              <span className="text-xs text-neutral-500">s/ anuncio: {(r.asking_yield * 100).toFixed(1)} %</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-neutral-600 dark:text-neutral-400">
+        <span>
+          Precio: <b className="text-neutral-900 dark:text-neutral-100">{fmtAED(r.price)}</b>
+        </span>
+        <span>AED/sqft: {r.price_per_sqft ? Math.round(r.price_per_sqft) : "—"}</span>
+        <span>
+          Renta mediana: {fmtAED(r.median_rent)}
+          {r.rent_n ? ` (${r.rent_n})` : ""}
+        </span>
+        <span>
+          Venta mediana: {fmtAED(r.median_sale_price)}
+          {r.buy_n ? ` (${r.buy_n})` : ""}
+        </span>
+        <span title={r.gym_name ?? undefined}>Gym: {fmtDist(r.gym_distance_m)}</span>
+        <span className="flex gap-2">
+          <Link href={`/listing/${r.id}`} className="font-medium text-blue-600 hover:underline dark:text-blue-400">
+            Ver análisis
+          </Link>
+          <a href={r.url} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline dark:text-blue-400">
+            PF ↗
+          </a>
+        </span>
+      </div>
+
+      <textarea
+        className="mt-2 h-9 w-full resize-none rounded-md border border-transparent bg-neutral-50 px-2 py-1 text-xs outline-none focus:border-neutral-300 dark:bg-neutral-950 dark:focus:border-neutral-700"
+        defaultValue={r.notes}
+        placeholder="notas…"
+        onBlur={(e) => saveNotes(r.id, e.target.value)}
+      />
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 flex overflow-hidden">
       {/* ------------------------------------------------ sidebar */}
@@ -488,96 +602,59 @@ export default function FavoritesMapPage() {
               No hay favoritos aún. Pega arriba un enlace de Property Finder o usa Sincronizar con PF.
             </p>
           ) : (
-            rows.map((r) => (
-              <div
-                key={r.id}
-                id={`fav-${r.id}`}
-                onMouseEnter={() => setHoveredId(r.id)}
-                onMouseLeave={() => setHoveredId(null)}
-                className={`border-b border-neutral-100 p-3 transition-colors dark:border-neutral-800 ${
-                  hoveredId === r.id ? "bg-blue-50 dark:bg-neutral-800" : ""
-                }`}
-              >
-                <div className="flex gap-3">
-                  {r.images?.[0] && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={r.images[0].small}
-                      alt=""
-                      onClick={() => focus(r)}
-                      className="h-16 w-24 shrink-0 cursor-pointer rounded-lg object-cover"
-                      loading="lazy"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
+            <>
+              {/* sort + bedroom filter */}
+              <div className="sticky top-0 z-10 flex flex-wrap items-center gap-1.5 border-b border-neutral-200 bg-white/95 px-3 py-2 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/95">
+                <span className="btn-font text-[10px] text-neutral-500">Ordenar</span>
+                {(["yield", "price"] as const).map((k) => (
+                  <button
+                    key={k}
+                    onClick={() => setSortBy(k)}
+                    className={`rounded px-2 py-0.5 text-[11px] ${
+                      sortBy === k
+                        ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                        : "border border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                    }`}
+                  >
+                    {k === "yield" ? "Rentabilidad" : "Precio"}
+                  </button>
+                ))}
+                {bedOptions.length > 0 && (
+                  <>
+                    <span className="btn-font ml-2 text-[10px] text-neutral-500">Hab</span>
+                    {bedOptions.map((b) => (
                       <button
-                        onClick={() => focus(r)}
-                        className="line-clamp-1 text-left font-sans text-sm font-semibold normal-case tracking-normal hover:underline"
-                        title="Centrar en el mapa"
+                        key={b}
+                        onClick={() => toggleBed(b)}
+                        className={`rounded px-2 py-0.5 text-[11px] ${
+                          bedFilter.includes(b)
+                            ? "bg-blue-600 text-white"
+                            : "border border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                        }`}
                       >
-                        {r.title}
+                        {bedLabel(b)}
                       </button>
-                      <button
-                        onClick={() => remove(r.id)}
-                        title="Quitar de favoritos"
-                        className="shrink-0 rounded-md px-1.5 text-xs text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
-                      >
-                        ✕
+                    ))}
+                    {bedFilter.length > 0 && (
+                      <button onClick={() => setBedFilter([])} className="px-1 text-[11px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200">
+                        Limpiar
                       </button>
-                    </div>
-                    <div className="truncate text-xs text-neutral-500">
-                      {r.tower_name} · {r.bedrooms === 0 ? "Studio" : `${r.bedrooms ?? "?"} hab`} / {r.bathrooms ?? "?"} baños ·{" "}
-                      {fmtSqft(r.size_sqft)}
-                    </div>
-                    <div className="mt-1 flex items-center gap-2">
-                      <YieldBadge value={r.gross_yield} n={r.rent_n ?? undefined} />
-                      {r.asking_yield != null && (
-                        <span className="text-xs text-neutral-500">
-                          s/ anuncio: {(r.asking_yield * 100).toFixed(1)} %
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-neutral-600 dark:text-neutral-400">
-                  <span>
-                    Precio: <b className="text-neutral-900 dark:text-neutral-100">{fmtAED(r.price)}</b>
-                  </span>
-                  <span>AED/sqft: {r.price_per_sqft ? Math.round(r.price_per_sqft) : "—"}</span>
-                  <span>
-                    Renta mediana: {fmtAED(r.median_rent)}
-                    {r.rent_n ? ` (${r.rent_n})` : ""}
-                  </span>
-                  <span>
-                    Venta mediana: {fmtAED(r.median_sale_price)}
-                    {r.buy_n ? ` (${r.buy_n})` : ""}
-                  </span>
-                  <span title={r.gym_name ?? undefined}>Gym: {fmtDist(r.gym_distance_m)}</span>
-                  <span className="flex gap-2">
-                    <Link href={`/listing/${r.id}`} className="font-medium text-blue-600 hover:underline dark:text-blue-400">
-                      Ver análisis
-                    </Link>
-                    <a
-                      href={r.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium text-blue-600 hover:underline dark:text-blue-400"
-                    >
-                      PF ↗
-                    </a>
-                  </span>
-                </div>
-
-                <textarea
-                  className="mt-2 h-9 w-full resize-none rounded-md border border-transparent bg-neutral-50 px-2 py-1 text-xs outline-none focus:border-neutral-300 dark:bg-neutral-950 dark:focus:border-neutral-700"
-                  defaultValue={r.notes}
-                  placeholder="notas…"
-                  onBlur={(e) => saveNotes(r.id, e.target.value)}
-                />
+                    )}
+                  </>
+                )}
               </div>
-            ))
+
+              {visible.map((r) => renderCard(r))}
+
+              {bedFilter.length > 0 && dimmed.length > 0 && (
+                <>
+                  <div className="btn-font border-y border-neutral-200 bg-neutral-100 px-3 py-1.5 text-[10px] text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950">
+                    No coinciden con el filtro ({dimmed.length})
+                  </div>
+                  {dimmed.map((r) => renderCard(r, true))}
+                </>
+              )}
+            </>
           )}
         </div>
       </aside>
