@@ -1,19 +1,22 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { listFavorites, txCountByTowerSince } from "@/lib/store";
 
 const MONTHS = 12;
 
 /**
- * Liquidity of each located favorite's tower = DLD transactions (buy + rent)
- * registered in the last 12 months. Feeds the heatmap: each favorite is a
- * weighted point, so nearby towers blend into a "how active is this pocket" surface.
+ * Liquidity of each located favorite's tower = DLD transactions registered in the
+ * last 12 months, split by kind via ?kind=buy|rent (defaults to rent). Feeds the
+ * heatmap: each favorite is a weighted point, so nearby towers blend into a
+ * "how active is this pocket" surface for that market (rentals vs sales).
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const kindParam = req.nextUrl.searchParams.get("kind");
+    const kind: "buy" | "rent" = kindParam === "buy" ? "buy" : "rent";
     const since = new Date();
     since.setMonth(since.getMonth() - MONTHS);
     const sinceISO = since.toISOString().slice(0, 10);
-    const counts = txCountByTowerSince(sinceISO);
+    const counts = txCountByTowerSince(sinceISO, kind);
 
     const points = listFavorites()
       .filter((f) => f.lat != null && f.lon != null)
@@ -25,7 +28,7 @@ export async function GET() {
       }));
 
     const max = points.reduce((m, p) => Math.max(m, p.weight), 0);
-    return NextResponse.json({ points, max, months: MONTHS });
+    return NextResponse.json({ points, max, months: MONTHS, kind });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

@@ -136,8 +136,8 @@ export default function FavoritesMapPage() {
   const [cafesVisible, setCafesVisible] = useState(false);
   const [cafesLoading, setCafesLoading] = useState(false);
   const [cafeCount, setCafeCount] = useState<number | null>(null);
-  const [heatVisible, setHeatVisible] = useState(false);
-  const [heatLoading, setHeatLoading] = useState(false);
+  const [heatKind, setHeatKind] = useState<"rent" | "buy" | null>(null);
+  const [heatLoading, setHeatLoading] = useState<"rent" | "buy" | null>(null);
   const [heatMax, setHeatMax] = useState<number | null>(null);
   const [showLayers, setShowLayers] = useState(false);
   const [sortBy, setSortBy] = useState<"yield" | "price">("yield");
@@ -471,18 +471,25 @@ export default function FavoritesMapPage() {
     });
 
   // Liquidity heatmap: DLD transactions per tower (last 12 months) as a heat surface.
-  const toggleLiquidity = async () => {
+  // Rent and sale are separate markets, so only one kind shows at a time.
+  const toggleLiquidity = async (kind: "rent" | "buy") => {
     const map = mapRef.current;
     if (!map || !leafletRef.current) return;
-    if (heatLayerRef.current) {
-      if (heatVisible) map.removeLayer(heatLayerRef.current);
-      else heatLayerRef.current.addTo(map);
-      setHeatVisible(!heatVisible);
+    // Clicking the active kind turns it off.
+    if (heatKind === kind) {
+      if (heatLayerRef.current) map.removeLayer(heatLayerRef.current);
+      heatLayerRef.current = null;
+      setHeatKind(null);
       return;
     }
-    setHeatLoading(true);
+    // Switching kinds: drop the current layer first.
+    if (heatLayerRef.current) {
+      map.removeLayer(heatLayerRef.current);
+      heatLayerRef.current = null;
+    }
+    setHeatLoading(kind);
     try {
-      const res = await fetch("/api/liquidity");
+      const res = await fetch(`/api/liquidity?kind=${kind}`);
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
       await import("leaflet.heat"); // patches L.heatLayer
@@ -491,26 +498,27 @@ export default function FavoritesMapPage() {
       // Each favorite blooms proportionally to its tower's recent activity; a small
       // floor keeps even low-liquidity listings visible as a faint mark.
       const pts = (j.points as { lat: number; lon: number; weight: number }[]).map(
-        (p) => [p.lat, p.lon, Math.max(0.12, p.weight / max)] as [number, number, number]
+        (p) => [p.lat, p.lon, Math.max(0.15, p.weight / max)] as [number, number, number]
       );
       type HeatFn = (latlngs: [number, number, number][], opts?: Record<string, unknown>) => import("leaflet").Layer;
       const Lmod = leafletRef.current as unknown as { heatLayer?: HeatFn; default?: { heatLayer?: HeatFn } };
       const heatLayer = Lmod.heatLayer ?? Lmod.default?.heatLayer;
       if (!heatLayer) throw new Error("plugin de calor no disponible");
       const layer = heatLayer(pts, {
-        radius: 38,
-        blur: 28,
+        radius: 40,
+        blur: 22,
         max: 1,
-        minOpacity: 0.25,
-        gradient: { 0.2: "#2b6cb0", 0.4: "#38bdf8", 0.6: "#a3e635", 0.8: "#fbbf24", 1.0: "#b84f30" },
+        minOpacity: 0.55,
+        // Yellow (low) → purple (high).
+        gradient: { 0.15: "#fef08a", 0.4: "#fde047", 0.65: "#d946ef", 1.0: "#7c3aed" },
       });
       layer.addTo(map);
       heatLayerRef.current = layer;
-      setHeatVisible(true);
+      setHeatKind(kind);
     } catch {
-      setHeatVisible(false);
+      setHeatKind(null);
     } finally {
-      setHeatLoading(false);
+      setHeatLoading(null);
     }
   };
 
@@ -728,11 +736,12 @@ export default function FavoritesMapPage() {
                     <LayerToggle label="Gimnasios" color="#b84f30" loading={gymsLoading} visible={gymsVisible} count={gymCount} onToggle={toggleGyms} />
                     <LayerToggle label="Cafeterías" color="#6f4e37" loading={cafesLoading} visible={cafesVisible} count={cafeCount} onToggle={toggleCafes} />
                     <div className="my-1 border-t border-neutral-200 dark:border-neutral-800" />
-                    <p className="px-2 pb-0.5 pt-0.5 text-[10px] uppercase tracking-wide text-neutral-400">Mapa de calor</p>
-                    <LayerToggle label="Liquidez (12m)" color="#fbbf24" loading={heatLoading} visible={heatVisible} count={null} onToggle={toggleLiquidity} />
-                    {heatVisible && (
+                    <p className="px-2 pb-0.5 pt-0.5 text-[10px] uppercase tracking-wide text-neutral-400">Mapa de calor de liquidez (12m)</p>
+                    <LayerToggle label="Alquiler" color="#d946ef" loading={heatLoading === "rent"} visible={heatKind === "rent"} count={null} onToggle={() => toggleLiquidity("rent")} />
+                    <LayerToggle label="Venta" color="#7c3aed" loading={heatLoading === "buy"} visible={heatKind === "buy"} count={null} onToggle={() => toggleLiquidity("buy")} />
+                    {heatKind && (
                       <p className="px-2 pb-1 pt-0.5 text-[10px] leading-tight text-neutral-500">
-                        Transacciones DLD por edificio (últimos 12 meses). Frío = poco líquido, cálido = mucha actividad.
+                        {heatKind === "rent" ? "Contratos de alquiler" : "Ventas"} (DLD) por edificio, últimos 12 meses. Amarillo = poco líquido, morado = mucha actividad.
                       </p>
                     )}
                   </div>
@@ -877,12 +886,14 @@ export default function FavoritesMapPage() {
       {/* ------------------------------------------------ map */}
       <div className="relative min-h-0 min-w-0 flex-1">
         <div ref={containerRef} className="absolute inset-0" />
-        {heatVisible && (
+        {heatKind && (
           <div className="pointer-events-none absolute bottom-4 left-3 z-[500] rounded border border-black/10 bg-white/90 px-2.5 py-2 text-neutral-700 shadow-lg dark:border-white/10 dark:bg-neutral-900/90 dark:text-neutral-200">
-            <div className="btn-font mb-1 text-[9px] text-neutral-500">Liquidez · transacciones/mes</div>
+            <div className="btn-font mb-1 text-[9px] text-neutral-500">
+              Liquidez {heatKind === "rent" ? "alquiler" : "venta"} · {heatKind === "rent" ? "contratos" : "ventas"}/mes
+            </div>
             <div
               className="h-2 w-52 rounded-sm"
-              style={{ background: "linear-gradient(90deg, #2b6cb0, #38bdf8, #a3e635, #fbbf24, #b84f30)" }}
+              style={{ background: "linear-gradient(90deg, #fef08a, #fde047, #d946ef, #7c3aed)" }}
             />
             <div className="mt-1 flex w-52 justify-between text-[10px] font-semibold">
               <span>0</span>
@@ -894,7 +905,7 @@ export default function FavoritesMapPage() {
               <span>activo</span>
             </div>
             <div className="mt-0.5 w-52 text-[9px] leading-tight text-neutral-400">
-              Transacciones DLD (compra + alquiler) del edificio, últimos 12 meses.
+              {heatKind === "rent" ? "Contratos de alquiler registrados" : "Ventas registradas"} en el DLD por edificio, últimos 12 meses.
             </div>
           </div>
         )}
