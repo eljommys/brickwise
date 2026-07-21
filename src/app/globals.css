@@ -26,11 +26,11 @@
 }
 
 @theme {
-  /* Neutral dark grays anchored to the #2c2c2c (44,44,44) background */
-  --color-neutral-950: #242424; /* deep insets / header */
-  --color-neutral-900: #2c2c2c; /* panels & cards == background */
-  --color-neutral-800: #383838; /* borders, dividers, hover (subtle) */
-  --color-neutral-700: #4a4a4a;
+  /* Neutral dark grays anchored to the #181818 background */
+  --color-neutral-950: #121212; /* deep insets / header */
+  --color-neutral-900: #181818; /* panels & cards == background */
+  --color-neutral-800: #2a2a2a; /* borders, dividers, hover (subtle) */
+  --color-neutral-700: #3a3a3a;
 
   /* Brick accent — remaps every blue-* usage in the app to color ladrillo */
   --color-blue-50: #faeee8;
@@ -58,7 +58,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #2c2c2c; /* gris muy oscuro (44,44,44) */
+    --background: #181818;
     --foreground: #ededed;
   }
 }
