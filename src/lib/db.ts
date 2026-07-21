@@ -100,6 +100,14 @@ CREATE TABLE IF NOT EXISTS gyms_list_cache (
   fetched_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS poi_list_cache (
+  geo_key TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  json TEXT NOT NULL,
+  fetched_at TEXT NOT NULL,
+  PRIMARY KEY (geo_key, kind)
+);
+
 CREATE TABLE IF NOT EXISTS favorites (
   listing_id TEXT PRIMARY KEY REFERENCES listings(id),
   notes TEXT NOT NULL DEFAULT '',

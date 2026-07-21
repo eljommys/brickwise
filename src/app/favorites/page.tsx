@@ -6,6 +6,7 @@ import "leaflet/dist/leaflet.css";
 import type { LayerGroup, Map as LeafletMap, Marker } from "leaflet";
 import YieldBadge from "@/components/YieldBadge";
 import { fmtAED, fmtDist, fmtSqft } from "@/lib/format";
+import { yieldColor } from "@/lib/yieldColor";
 
 interface FavRow {
   id: string;
@@ -41,21 +42,10 @@ const MORE_SVG = (
 );
 
 const GYM_SVG = `<svg viewBox="0 0 24 24" width="14" height="14" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M2 10h2v4H2zM5 8h2v8H5zM17 8h2v8h-2zM20 10h2v4h-2zM8 11h8v2H8z"/></svg>`;
+const CAFE_SVG = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M4 8h12v5a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8z"/><path d="M16 9h2a2 2 0 0 1 0 4h-2"/><path d="M6 3v2M10 3v2M14 3v2"/></svg>`;
 
 function matchesBedFilter(r: { bedrooms: number | null }, bedFilter: number[]): boolean {
   return bedFilter.length === 0 || (r.bedrooms != null && bedFilter.includes(r.bedrooms));
-}
-
-// Yield color anchors: ≤6% red (mediocre) → 10%+ turquoise (espectacular),
-// with 8–9% around the green middle (bueno).
-const YIELD_LOW = 0.06;
-const YIELD_HIGH = 0.1;
-
-function yieldColor(y: number | null): string {
-  if (y == null) return "#8a8a8a";
-  const t = Math.min(1, Math.max(0, (y - YIELD_LOW) / (YIELD_HIGH - YIELD_LOW)));
-  const hue = t * 174; // 0° red → 174° turquoise
-  return `hsl(${Math.round(hue)}, 66%, 44%)`;
 }
 
 function popupHtml(r: FavRow): string {
@@ -104,6 +94,9 @@ export default function FavoritesMapPage() {
   const [gymsVisible, setGymsVisible] = useState(false);
   const [gymsLoading, setGymsLoading] = useState(false);
   const [gymCount, setGymCount] = useState<number | null>(null);
+  const [cafesVisible, setCafesVisible] = useState(false);
+  const [cafesLoading, setCafesLoading] = useState(false);
+  const [cafeCount, setCafeCount] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<"yield" | "price">("yield");
   const [bedFilter, setBedFilter] = useState<number[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -112,6 +105,7 @@ export default function FavoritesMapPage() {
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
   const markersRef = useRef<Record<string, Marker>>({});
   const gymLayerRef = useRef<LayerGroup | null>(null);
+  const cafeLayerRef = useRef<LayerGroup | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const didFitRef = useRef(false);
   const processing = useRef(false);
@@ -194,6 +188,7 @@ export default function FavoritesMapPage() {
       mapRef.current = null;
       markersRef.current = {};
       gymLayerRef.current = null;
+      cafeLayerRef.current = null;
       didFitRef.current = false;
       setMapReady(false);
     };
@@ -326,51 +321,78 @@ export default function FavoritesMapPage() {
     }
   };
 
-  const toggleGyms = async () => {
+  // Build a Leaflet layer of POI markers (gyms / cafés) with a Google Maps popup.
+  const buildPoiLayer = (
+    L: typeof import("leaflet"),
+    items: { name: string; lat: number; lon: number }[],
+    cssClass: string,
+    svg: string
+  ) => {
+    const layer = L.layerGroup();
+    for (const p of items) {
+      const icon = L.divIcon({ className: "", html: `<div class="${cssClass}">${svg}</div>`, iconSize: [0, 0], iconAnchor: [0, 0] });
+      const safeName = p.name.replace(/[<>&"]/g, (c) => `&#${c.charCodeAt(0)};`);
+      // Coordinates, not a text search: a name search gets biased to the viewer's location.
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${p.lat}%2C${p.lon}`;
+      L.marker([p.lat, p.lon], { icon })
+        .bindPopup(
+          `<b>${safeName}</b><br><a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" style="font-size:12px">Ver en Google Maps ↗</a>`,
+          { offset: [0, -16] }
+        )
+        .addTo(layer);
+    }
+    return layer;
+  };
+
+  const togglePoi = async (opts: {
+    api: string;
+    dataKey: string;
+    cssClass: string;
+    svg: string;
+    layerRef: React.MutableRefObject<LayerGroup | null>;
+    visible: boolean;
+    setVisible: (v: boolean) => void;
+    setLoading: (v: boolean) => void;
+    setCount: (v: number | null) => void;
+  }) => {
     const map = mapRef.current;
     const L = leafletRef.current;
     if (!map || !L) return;
-    if (gymLayerRef.current) {
-      if (gymsVisible) map.removeLayer(gymLayerRef.current);
-      else gymLayerRef.current.addTo(map);
-      setGymsVisible(!gymsVisible);
+    if (opts.layerRef.current) {
+      if (opts.visible) map.removeLayer(opts.layerRef.current);
+      else opts.layerRef.current.addTo(map);
+      opts.setVisible(!opts.visible);
       return;
     }
-    setGymsLoading(true);
+    opts.setLoading(true);
     try {
-      const res = await fetch("/api/gyms");
+      const res = await fetch(opts.api);
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
-      const layer = L.layerGroup();
-      for (const g of j.gyms as { name: string; lat: number; lon: number }[]) {
-        const icon = L.divIcon({
-          className: "",
-          html: `<div class="bw-gym">${GYM_SVG}</div>`,
-          iconSize: [0, 0],
-          iconAnchor: [0, 0],
-        });
-        const safeName = g.name.replace(/[<>&"]/g, (c) => `&#${c.charCodeAt(0)};`);
-        // Link to the exact coordinates, not a text search: a name search gets biased
-        // to the viewer's own location (e.g. Andorra), while coordinates always drop
-        // the pin on this gym's spot in Dubai.
-        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${g.lat}%2C${g.lon}`;
-        L.marker([g.lat, g.lon], { icon })
-          .bindPopup(
-            `<b>${safeName}</b><br><a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" style="font-size:12px">Ver en Google Maps ↗</a>`,
-            { offset: [0, -16] }
-          )
-          .addTo(layer);
-      }
+      const items = j[opts.dataKey] as { name: string; lat: number; lon: number }[];
+      const layer = buildPoiLayer(L, items, opts.cssClass, opts.svg);
       layer.addTo(map);
-      gymLayerRef.current = layer;
-      setGymCount(j.gyms.length);
-      setGymsVisible(true);
+      opts.layerRef.current = layer;
+      opts.setCount(items.length);
+      opts.setVisible(true);
     } catch {
-      setGymCount(null);
+      opts.setCount(null);
     } finally {
-      setGymsLoading(false);
+      opts.setLoading(false);
     }
   };
+
+  const toggleGyms = () =>
+    togglePoi({
+      api: "/api/gyms", dataKey: "gyms", cssClass: "bw-gym", svg: GYM_SVG,
+      layerRef: gymLayerRef, visible: gymsVisible, setVisible: setGymsVisible, setLoading: setGymsLoading, setCount: setGymCount,
+    });
+
+  const toggleCafes = () =>
+    togglePoi({
+      api: "/api/cafes", dataKey: "cafes", cssClass: "bw-cafe", svg: CAFE_SVG,
+      layerRef: cafeLayerRef, visible: cafesVisible, setVisible: setCafesVisible, setLoading: setCafesLoading, setCount: setCafeCount,
+    });
 
   // --- Resizable divider ---------------------------------------------------
   const startDrag = (e: React.MouseEvent) => {
@@ -565,20 +587,36 @@ export default function FavoritesMapPage() {
               >
                 {busy ? `Analizando ${queue.length}…` : "Añadir y analizar"}
               </button>
-              <button
-                type="button"
-                onClick={toggleGyms}
-                disabled={gymsLoading || (rows?.length ?? 0) === 0}
-                className="w-full rounded-lg border border-neutral-300 py-2 text-xs font-semibold hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
-              >
-                {gymsLoading
-                  ? "Buscando…"
-                  : gymCount != null
-                    ? gymsVisible
-                      ? `Ocultar gyms (${gymCount})`
-                      : `Mostrar gyms (${gymCount})`
-                    : "Gimnasios"}
-              </button>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={toggleGyms}
+                  disabled={gymsLoading || (rows?.length ?? 0) === 0}
+                  className="flex-1 rounded-lg border border-neutral-300 py-2 text-xs font-semibold hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                >
+                  {gymsLoading
+                    ? "Buscando…"
+                    : gymCount != null
+                      ? gymsVisible
+                        ? `Ocultar gyms (${gymCount})`
+                        : `Mostrar gyms (${gymCount})`
+                      : "Gimnasios"}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleCafes}
+                  disabled={cafesLoading || (rows?.length ?? 0) === 0}
+                  className="flex-1 rounded-lg border border-neutral-300 py-2 text-xs font-semibold hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                >
+                  {cafesLoading
+                    ? "Buscando…"
+                    : cafeCount != null
+                      ? cafesVisible
+                        ? `Ocultar cafés (${cafeCount})`
+                        : `Mostrar cafés (${cafeCount})`
+                      : "Cafeterías"}
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowSync((v) => !v)}
