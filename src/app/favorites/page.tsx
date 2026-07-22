@@ -187,6 +187,12 @@ export default function FavoritesMapPage() {
   const spiderOpenRef = useRef<string | null>(null);
   const spiderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unspiderfyRef = useRef<() => void>(() => {});
+  // Fan geometry (container px) + live pointer position. Collapse is decided by
+  // "is the pointer still inside the fan area", NEVER by marker mouseout alone:
+  // fanning moves the pins away from the cursor, so mouseout-driven collapse
+  // oscillates open/closed in a loop under a resting cursor.
+  const spiderGeomRef = useRef<{ x: number; y: number; r: number } | null>(null);
+  const pointerRef = useRef<{ x: number; y: number; inside: boolean }>({ x: 0, y: 0, inside: false });
   const containerRef = useRef<HTMLDivElement | null>(null);
   const didFitRef = useRef(false);
   const processing = useRef(false);
@@ -261,6 +267,31 @@ export default function FavoritesMapPage() {
       // Pixel-space spider offsets stop making sense once the zoom changes.
       map.on("zoomstart", () => unspiderfyRef.current());
 
+      // Pointer tracking for the spiderfy collapse guard: the fan stays open
+      // while the pointer is inside its area and closes the moment it leaves —
+      // marker mouseout alone can't decide this (the fan moves pins away from
+      // the cursor, which would oscillate open/closed in a loop).
+      const onSpiderMove = (e: MouseEvent) => {
+        const rect = el.getBoundingClientRect();
+        pointerRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top, inside: true };
+        const g = spiderGeomRef.current;
+        if (g) {
+          const dx = pointerRef.current.x - g.x;
+          const dy = pointerRef.current.y - g.y;
+          if (dx * dx + dy * dy > g.r * g.r) unspiderfyRef.current();
+        }
+      };
+      const onSpiderLeave = () => {
+        pointerRef.current.inside = false;
+        unspiderfyRef.current();
+      };
+      el.addEventListener("mousemove", onSpiderMove);
+      el.addEventListener("mouseleave", onSpiderLeave);
+      map.on("remove", () => {
+        el.removeEventListener("mousemove", onSpiderMove);
+        el.removeEventListener("mouseleave", onSpiderLeave);
+      });
+
       // Keep the heat influence constant in real-world size across zoom levels:
       // rescale the pixel radius whenever the zoom settles.
       map.on("zoomend", () => {
@@ -324,6 +355,7 @@ export default function FavoritesMapPage() {
     if (spiderLayerRef.current) mapRef.current?.removeLayer(spiderLayerRef.current);
     spiderLayerRef.current = null;
     spiderOpenRef.current = null;
+    spiderGeomRef.current = null;
   };
   useEffect(() => {
     unspiderfyRef.current = unspiderfy;
@@ -331,7 +363,20 @@ export default function FavoritesMapPage() {
 
   const scheduleCollapse = () => {
     cancelCollapse();
-    spiderTimerRef.current = setTimeout(unspiderfy, 250);
+    spiderTimerRef.current = setTimeout(() => {
+      // Pointer still inside the fan area (fanning moved the pins away from the
+      // cursor, so a mouseout fired even though the user is "on" the group):
+      // keep it open — the map mousemove guard collapses it once the pointer
+      // actually leaves the area.
+      const g = spiderGeomRef.current;
+      const p = pointerRef.current;
+      if (g && p.inside) {
+        const dx = p.x - g.x;
+        const dy = p.y - g.y;
+        if (dx * dx + dy * dy <= g.r * g.r) return;
+      }
+      unspiderfy();
+    }, 250);
   };
 
   const spiderfy = (key: string) => {
@@ -367,6 +412,9 @@ export default function FavoritesMapPage() {
     layer.addTo(map);
     spiderLayerRef.current = layer;
     spiderOpenRef.current = key;
+    // Fan area for the pointer-distance guard: radius + room for the pin labels.
+    const c0 = map.latLngToContainerPoint(anchor);
+    spiderGeomRef.current = { x: c0.x, y: c0.y, r: radius + 100 };
   };
 
   // --- Property markers: kept in sync with the favorites list --------------
