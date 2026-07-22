@@ -87,18 +87,18 @@ const SAVED_URL = "https://www.propertyfinder.ae/en/user/saved-properties";
 const BOOKMARKLET = String.raw`javascript:(function(){var u=new Set();document.querySelectorAll('a[href]').forEach(function(a){var h=(a.href||'').split('?')[0];if(/\/plp\/.*-\d+\.html$/.test(h))u.add(h)});try{var n=document.getElementById('__NEXT_DATA__');if(n){(JSON.stringify(JSON.parse(n.textContent)).match(/https?:\/\/[^"']*\/plp\/[^"']*-\d+\.html/g)||[]).forEach(function(x){u.add(x.split('?')[0])})}}catch(e){}var l=[...u];if(!l.length){alert('No encontre pisos guardados aqui. Abre tu pagina de Guardados de Property Finder con la sesion iniciada.');return}var t=l.join('\n');if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){alert(l.length+' piso(s) copiados. Abre Brickwise y pulsa "Pegar de Property Finder".')},function(){prompt('Copia estos enlaces y pegalos en Brickwise:',t)})}else{prompt('Copia estos enlaces y pegalos en Brickwise:',t)}})();`;
 
 // leaflet.heat's radius is in screen pixels, so a fixed value shrinks in real-world
-// terms as you zoom in. Anchor the radius to a reference zoom and scale by 2^(Δzoom)
-// (each zoom level doubles pixels-per-meter) so the geographic influence stays constant.
-const HEAT_REF_ZOOM = 12;
-const HEAT_REF_RADIUS = 40;
-const HEAT_REF_BLUR = 22;
+// terms as you zoom in. Scale it by 2^(Δzoom) from a reference zoom so the geographic
+// influence grows as you zoom in — but HARD-CAP it: an uncapped radius becomes a
+// district-sized disc whose brush gets clipped at the canvas edge, showing as hard
+// "growing quarter-circles". The cap keeps every bloom a smooth, localized spot.
+const HEAT_REF_ZOOM = 13;
+const HEAT_REF_RADIUS = 26;
+const HEAT_MIN_RADIUS = 14;
+const HEAT_MAX_RADIUS = 70;
 function heatRadiusForZoom(zoom: number): { radius: number; blur: number } {
   const scale = Math.pow(2, zoom - HEAT_REF_ZOOM);
-  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-  return {
-    radius: clamp(HEAT_REF_RADIUS * scale, 6, 900),
-    blur: clamp(HEAT_REF_BLUR * scale, 4, 500),
-  };
+  const radius = Math.min(HEAT_MAX_RADIUS, Math.max(HEAT_MIN_RADIUS, HEAT_REF_RADIUS * scale));
+  return { radius, blur: Math.round(radius * 0.75) };
 }
 
 function LayerToggle({
@@ -639,7 +639,7 @@ export default function FavoritesMapPage() {
         radius,
         blur,
         max: 1,
-        minOpacity: 0.55,
+        minOpacity: 0.4, // lower = softer bloom edges (no hard disc boundary)
         // Yellow (low) → purple (high).
         gradient: { 0.15: "#fef08a", 0.4: "#fde047", 0.65: "#d946ef", 1.0: "#7c3aed" },
       });
