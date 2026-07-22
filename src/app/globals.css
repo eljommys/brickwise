@@ -150,6 +150,17 @@ button[class*="bg-blue-5"],
   box-shadow: 0 0 0 3px rgba(184, 79, 48, 0.6);
 }
 
+/* Spiderfy: dot marking the building a fanned-out group belongs to */
+.bw-spider-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #b84f30;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%);
+}
+
 /* Filtered-out markers: darker + transparent */
 .bw-pin--dim {
   opacity: 0.4;

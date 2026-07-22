@@ -178,6 +178,15 @@ export default function FavoritesMapPage() {
   const cafeLayerRef = useRef<LayerGroup | null>(null);
   const heatLayerRef = useRef<import("leaflet").Layer | null>(null);
   const heatBusyRef = useRef(false); // synchronous re-entry guard for the heat toggle
+  // Spiderfy state: same-building favorites share exact coordinates, so their pins
+  // stack. On hover the group fans out around a dot at the building, with legs.
+  const groupsRef = useRef<Map<string, string[]>>(new Map()); // groupKey -> listing ids
+  const groupOfRef = useRef<Map<string, string>>(new Map()); // listing id -> groupKey
+  const origLatLngRef = useRef<Map<string, [number, number]>>(new Map());
+  const spiderLayerRef = useRef<LayerGroup | null>(null); // legs + center dot
+  const spiderOpenRef = useRef<string | null>(null);
+  const spiderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unspiderfyRef = useRef<() => void>(() => {});
   const containerRef = useRef<HTMLDivElement | null>(null);
   const didFitRef = useRef(false);
   const processing = useRef(false);
@@ -249,6 +258,9 @@ export default function FavoritesMapPage() {
       el.addEventListener("wheel", onWheel, { passive: false });
       map.on("remove", () => el.removeEventListener("wheel", onWheel));
 
+      // Pixel-space spider offsets stop making sense once the zoom changes.
+      map.on("zoomstart", () => unspiderfyRef.current());
+
       // Keep the heat influence constant in real-world size across zoom levels:
       // rescale the pixel radius whenever the zoom settles.
       map.on("zoomend", () => {
@@ -287,16 +299,95 @@ export default function FavoritesMapPage() {
     };
   }, []);
 
+  // --- Spiderfy: fan out stacked same-building pins on hover ---------------
+  // All of these read refs only, so the instances captured by long-lived marker
+  // handlers never go stale.
+  const cancelCollapse = () => {
+    if (spiderTimerRef.current) {
+      clearTimeout(spiderTimerRef.current);
+      spiderTimerRef.current = null;
+    }
+  };
+
+  const unspiderfy = () => {
+    cancelCollapse();
+    const key = spiderOpenRef.current;
+    if (!key) return;
+    for (const id of groupsRef.current.get(key) ?? []) {
+      const m = markersRef.current[id];
+      const ll = origLatLngRef.current.get(id);
+      if (m && ll) {
+        m.setLatLng(ll);
+        m.setZIndexOffset(0);
+      }
+    }
+    if (spiderLayerRef.current) mapRef.current?.removeLayer(spiderLayerRef.current);
+    spiderLayerRef.current = null;
+    spiderOpenRef.current = null;
+  };
+  useEffect(() => {
+    unspiderfyRef.current = unspiderfy;
+  });
+
+  const scheduleCollapse = () => {
+    cancelCollapse();
+    spiderTimerRef.current = setTimeout(unspiderfy, 250);
+  };
+
+  const spiderfy = (key: string) => {
+    const map = mapRef.current;
+    const L = leafletRef.current;
+    if (!map || !L) return;
+    if (spiderOpenRef.current === key) return; // already open
+    unspiderfy();
+    const ids = groupsRef.current.get(key);
+    if (!ids || ids.length < 2) return;
+    const anchor = origLatLngRef.current.get(ids[0]);
+    if (!anchor) return;
+    const p0 = map.latLngToLayerPoint(anchor);
+    const radius = Math.min(90, 34 + 14 * ids.length);
+    const layer = L.layerGroup();
+    ids.forEach((id, i) => {
+      const m = markersRef.current[id];
+      if (!m) return;
+      // Fan across the upper semicircle (pins are labels anchored bottom-center).
+      const a = ((-160 + (140 * i) / Math.max(1, ids.length - 1)) * Math.PI) / 180;
+      const ll = map.layerPointToLatLng(
+        L.point(p0.x + radius * Math.cos(a), p0.y + radius * Math.sin(a))
+      );
+      m.setLatLng(ll);
+      m.setZIndexOffset(2000);
+      L.polyline([anchor, [ll.lat, ll.lng]], { color: "#b84f30", weight: 1.5, opacity: 0.8 }).addTo(layer);
+    });
+    // Dot marking the building itself.
+    L.marker(anchor, {
+      icon: L.divIcon({ className: "", html: `<div class="bw-spider-dot"></div>`, iconSize: [0, 0], iconAnchor: [0, 0] }),
+      interactive: false,
+    }).addTo(layer);
+    layer.addTo(map);
+    spiderLayerRef.current = layer;
+    spiderOpenRef.current = key;
+  };
+
   // --- Property markers: kept in sync with the favorites list --------------
   useEffect(() => {
     const L = leafletRef.current;
     const map = mapRef.current;
     if (!L || !map || !mapReady || !rows) return;
+    unspiderfy(); // stale spider legs/dot must not survive a marker rebuild
     Object.values(markersRef.current).forEach((m) => m.remove());
     markersRef.current = {};
+    groupsRef.current = new Map();
+    groupOfRef.current = new Map();
+    origLatLngRef.current = new Map();
     const bounds: [number, number][] = [];
     for (const r of rows) {
       if (r.lat == null || r.lon == null) continue;
+      // Same-building listings share exact coordinates: group them for spiderfy.
+      const groupKey = `${r.lat.toFixed(5)},${r.lon.toFixed(5)}`;
+      groupsRef.current.set(groupKey, [...(groupsRef.current.get(groupKey) ?? []), r.id]);
+      groupOfRef.current.set(r.id, groupKey);
+      origLatLngRef.current.set(r.id, [r.lat, r.lon]);
       const y = r.asking_yield != null ? (r.asking_yield * 100).toFixed(1) + "%" : "—";
       const icon = L.divIcon({
         className: "",
@@ -308,10 +399,15 @@ export default function FavoritesMapPage() {
         .addTo(map)
         .bindPopup(popupHtml(r), { maxWidth: 260, offset: [0, -34] });
       marker.on("mouseover", () => {
+        cancelCollapse();
+        if ((groupsRef.current.get(groupKey)?.length ?? 0) > 1) spiderfy(groupKey);
         setHoveredId(r.id);
         document.getElementById(`fav-${r.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
       });
-      marker.on("mouseout", () => setHoveredId(null));
+      marker.on("mouseout", () => {
+        setHoveredId(null);
+        scheduleCollapse();
+      });
       markersRef.current[r.id] = marker;
       bounds.push([r.lat, r.lon]);
     }
@@ -319,15 +415,31 @@ export default function FavoritesMapPage() {
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
       didFitRef.current = true;
     }
+    // spiderfy/unspiderfy/scheduleCollapse read refs only — never stale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, mapReady]);
 
   // --- Bidirectional hover highlight ---------------------------------------
   useEffect(() => {
+    const spiderKey = spiderOpenRef.current;
     for (const [id, m] of Object.entries(markersRef.current)) {
       const pin = m.getElement()?.querySelector(".bw-pin");
       pin?.classList.toggle("bw-pin--hl", id === hoveredId);
-      m.setZIndexOffset(id === hoveredId ? 1000 : 0);
+      // Don't stomp the raised z-index of a fanned-out group.
+      const inOpenGroup = spiderKey != null && groupOfRef.current.get(id) === spiderKey;
+      m.setZIndexOffset(id === hoveredId ? 3000 : inOpenGroup ? 2000 : 0);
     }
+    // Hovering a list card whose pin is stacked: fan the group out so it's visible.
+    if (hoveredId) {
+      const gk = groupOfRef.current.get(hoveredId);
+      if (gk && (groupsRef.current.get(gk)?.length ?? 0) > 1) {
+        cancelCollapse();
+        spiderfy(gk);
+      }
+    } else {
+      scheduleCollapse();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hoveredId]);
 
   // --- Filter: dim (darker + transparent) the markers that don't match -----
@@ -827,6 +939,9 @@ export default function FavoritesMapPage() {
             Brickwise
           </Link>
           <span className="ml-auto flex items-center gap-1 text-xs">
+            <Link href="/pipeline" className="btn-font rounded-full px-2.5 py-1 font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800">
+              Pipeline
+            </Link>
             <Link href="/" className="btn-font rounded-full px-2.5 py-1 font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800">
               Analizados
             </Link>
