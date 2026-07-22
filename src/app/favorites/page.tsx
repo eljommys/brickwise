@@ -183,6 +183,9 @@ export default function FavoritesMapPage() {
   const groupsRef = useRef<Map<string, string[]>>(new Map()); // groupKey -> listing ids
   const groupOfRef = useRef<Map<string, string>>(new Map()); // listing id -> groupKey
   const origLatLngRef = useRef<Map<string, [number, number]>>(new Map());
+  // Yield-proportional base z-index so the most profitable pin of a stack is the
+  // visible one; hover/spider boosts are added ON TOP of this base.
+  const baseZRef = useRef<Map<string, number>>(new Map());
   const spiderLayerRef = useRef<LayerGroup | null>(null); // legs + center dot
   const spiderOpenRef = useRef<string | null>(null);
   const spiderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -349,7 +352,7 @@ export default function FavoritesMapPage() {
       const ll = origLatLngRef.current.get(id);
       if (m && ll) {
         m.setLatLng(ll);
-        m.setZIndexOffset(0);
+        m.setZIndexOffset(baseZRef.current.get(id) ?? 0);
       }
     }
     if (spiderLayerRef.current) mapRef.current?.removeLayer(spiderLayerRef.current);
@@ -401,7 +404,7 @@ export default function FavoritesMapPage() {
         L.point(p0.x + radius * Math.cos(a), p0.y + radius * Math.sin(a))
       );
       m.setLatLng(ll);
-      m.setZIndexOffset(2000);
+      m.setZIndexOffset((baseZRef.current.get(id) ?? 0) + 20000);
       L.polyline([anchor, [ll.lat, ll.lng]], { color: "#b84f30", weight: 1.5, opacity: 0.8 }).addTo(layer);
     });
     // Dot marking the building itself.
@@ -428,6 +431,7 @@ export default function FavoritesMapPage() {
     groupsRef.current = new Map();
     groupOfRef.current = new Map();
     origLatLngRef.current = new Map();
+    baseZRef.current = new Map();
     const bounds: [number, number][] = [];
     for (const r of rows) {
       if (r.lat == null || r.lon == null) continue;
@@ -443,7 +447,11 @@ export default function FavoritesMapPage() {
         iconSize: [0, 0],
         iconAnchor: [0, 0],
       });
-      const marker = L.marker([r.lat, r.lon], { icon })
+      // Stack order = yield: the most profitable listing of a building is the
+      // pin you see when the group is collapsed.
+      const baseZ = Math.round((r.asking_yield ?? 0) * 10000);
+      baseZRef.current.set(r.id, baseZ);
+      const marker = L.marker([r.lat, r.lon], { icon, zIndexOffset: baseZ })
         .addTo(map)
         .bindPopup(popupHtml(r), { maxWidth: 260, offset: [0, -34] });
       marker.on("mouseover", () => {
@@ -473,9 +481,11 @@ export default function FavoritesMapPage() {
     for (const [id, m] of Object.entries(markersRef.current)) {
       const pin = m.getElement()?.querySelector(".bw-pin");
       pin?.classList.toggle("bw-pin--hl", id === hoveredId);
-      // Don't stomp the raised z-index of a fanned-out group.
+      // Boosts stack on the yield-proportional base so collapsed groups keep
+      // showing their most profitable pin.
+      const base = baseZRef.current.get(id) ?? 0;
       const inOpenGroup = spiderKey != null && groupOfRef.current.get(id) === spiderKey;
-      m.setZIndexOffset(id === hoveredId ? 3000 : inOpenGroup ? 2000 : 0);
+      m.setZIndexOffset(id === hoveredId ? base + 30000 : inOpenGroup ? base + 20000 : base);
     }
     // Hovering a list card whose pin is stacked: fan the group out so it's visible.
     if (hoveredId) {
