@@ -177,6 +177,7 @@ export default function FavoritesMapPage() {
   const gymLayerRef = useRef<LayerGroup | null>(null);
   const cafeLayerRef = useRef<LayerGroup | null>(null);
   const heatLayerRef = useRef<import("leaflet").Layer | null>(null);
+  const heatBusyRef = useRef(false); // synchronous re-entry guard for the heat toggle
   const containerRef = useRef<HTMLDivElement | null>(null);
   const didFitRef = useRef(false);
   const processing = useRef(false);
@@ -596,6 +597,10 @@ export default function FavoritesMapPage() {
   const toggleLiquidity = async (kind: "rent" | "buy") => {
     const map = mapRef.current;
     if (!map || !leafletRef.current) return;
+    // Ignore clicks while a layer is still loading — otherwise a second fetch
+    // would add a second (orphaned) heat canvas that never gets removed and
+    // shows as a duplicate circle that doesn't rescale on zoom.
+    if (heatBusyRef.current) return;
     // Clicking the active kind turns it off.
     if (heatKind === kind) {
       if (heatLayerRef.current) map.removeLayer(heatLayerRef.current);
@@ -608,6 +613,7 @@ export default function FavoritesMapPage() {
       map.removeLayer(heatLayerRef.current);
       heatLayerRef.current = null;
     }
+    heatBusyRef.current = true;
     setHeatLoading(kind);
     setHeatError(null);
     try {
@@ -645,6 +651,7 @@ export default function FavoritesMapPage() {
       setHeatError((e as Error).message || "No se pudo cargar el mapa de calor.");
     } finally {
       setHeatLoading(null);
+      heatBusyRef.current = false;
     }
   };
 
