@@ -29,7 +29,7 @@ type SortKey = "gross_yield" | "asking_yield" | "price" | "gym_distance_m";
 
 export default function Dashboard() {
   const [rows, setRows] = useState<Row[] | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>("gross_yield");
+  const [sortKey, setSortKey] = useState<SortKey>("asking_yield");
   const [asc, setAsc] = useState(false);
 
   useEffect(() => {
@@ -93,8 +93,8 @@ export default function Dashboard() {
             <thead className="border-b border-neutral-200 dark:border-neutral-800">
               <tr>
                 <th className="px-3 py-2 text-left text-xs font-semibold text-neutral-500">Inmueble</th>
-                {header("Rentabilidad", "gross_yield")}
-                {header("s/ anuncio", "asking_yield")}
+                {header("Rentabilidad", "asking_yield")}
+                {header("Mercado", "gross_yield")}
                 {header("Precio", "price")}
                 <th className="px-3 py-2 text-left text-xs font-semibold text-neutral-500">Venta mediana</th>
                 {header("Gym", "gym_distance_m")}
@@ -122,10 +122,10 @@ export default function Dashboard() {
                     </div>
                   </td>
                   <td className="px-3 py-2">
-                    <YieldBadge value={r.gross_yield} n={r.rent_n} />
+                    <YieldBadge value={r.asking_yield} n={r.rent_n} />
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {r.asking_yield != null ? (r.asking_yield * 100).toFixed(1) + " %" : "—"}
+                  <td className="px-3 py-2 whitespace-nowrap text-neutral-500">
+                    {r.gross_yield != null ? (r.gross_yield * 100).toFixed(1) + " %" : "—"}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap font-medium">{fmtAED(r.price)}</td>
                   <td className="px-3 py-2 whitespace-nowrap">

@@ -59,14 +59,14 @@ function matchesBedFilter(r: { bedrooms: number | null }, bedFilter: number[]): 
 
 function popupHtml(r: FavRow): string {
   const img = r.images?.[0]?.medium || r.images?.[0]?.small;
-  const yieldTxt = r.gross_yield != null ? (r.gross_yield * 100).toFixed(1) + " %" : "sin datos";
+  const yieldTxt = r.asking_yield != null ? (r.asking_yield * 100).toFixed(1) + " %" : "sin datos";
   return `
     <div style="width:230px">
       ${img ? `<img src="${img}" style="width:100%;height:120px;object-fit:cover;border-radius:8px" alt=""/>` : ""}
       <div style="font-weight:600;margin-top:6px;line-height:1.3">${r.title}</div>
       <div style="color:#666;font-size:12px;margin-top:2px">${r.tower_name ?? ""}</div>
       <div style="margin-top:4px;font-size:14px">
-        Rentabilidad: <span style="color:${yieldColor(r.gross_yield)};font-weight:700">${yieldTxt}</span>
+        Rentabilidad: <span style="color:${yieldColor(r.asking_yield)};font-weight:700">${yieldTxt}</span>
       </div>
       <div style="margin-top:6px;display:flex;gap:10px;font-size:12px">
         <a href="/listing/${r.id}">Ver análisis</a>
@@ -297,10 +297,10 @@ export default function FavoritesMapPage() {
     const bounds: [number, number][] = [];
     for (const r of rows) {
       if (r.lat == null || r.lon == null) continue;
-      const y = r.gross_yield != null ? (r.gross_yield * 100).toFixed(1) + "%" : "—";
+      const y = r.asking_yield != null ? (r.asking_yield * 100).toFixed(1) + "%" : "—";
       const icon = L.divIcon({
         className: "",
-        html: `<div class="bw-pin" style="--pin-color:${yieldColor(r.gross_yield)}"><div class="bw-pin-label">${y}</div><div class="bw-pin-tail"></div></div>`,
+        html: `<div class="bw-pin" style="--pin-color:${yieldColor(r.asking_yield)}"><div class="bw-pin-label">${y}</div><div class="bw-pin-tail"></div></div>`,
         iconSize: [0, 0],
         iconAnchor: [0, 0],
       });
@@ -683,7 +683,7 @@ export default function FavoritesMapPage() {
   const sorted = [...(rows ?? [])].sort((a, b) =>
     sortBy === "price"
       ? a.price - b.price
-      : (b.gross_yield ?? -1) - (a.gross_yield ?? -1)
+      : (b.asking_yield ?? -1) - (a.asking_yield ?? -1)
   );
   const visible = sorted.filter((r) => matchesBedFilter(r, bedFilter));
   const dimmed = sorted.filter((r) => !matchesBedFilter(r, bedFilter));
@@ -750,9 +750,9 @@ export default function FavoritesMapPage() {
             {fmtSqft(r.size_sqft)}
           </div>
           <div className="mt-1 flex items-center gap-2">
-            <YieldBadge value={r.gross_yield} n={r.rent_n ?? undefined} />
-            {r.asking_yield != null && (
-              <span className="text-xs text-neutral-500">s/ anuncio: {(r.asking_yield * 100).toFixed(1)} %</span>
+            <YieldBadge value={r.asking_yield} n={r.rent_n ?? undefined} />
+            {r.gross_yield != null && (
+              <span className="text-xs text-neutral-500">mercado: {(r.gross_yield * 100).toFixed(1)} %</span>
             )}
           </div>
         </div>

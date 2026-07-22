@@ -87,7 +87,7 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
       <div>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold">{listing.title}</h1>
-          <YieldBadge value={analysis.gross_yield} n={analysis.rent_n} />
+          <YieldBadge value={analysis.asking_yield} n={analysis.rent_n} />
         </div>
         <div className="mt-1 flex items-center gap-4">
           <a
@@ -187,10 +187,10 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
-            label="Rentabilidad anual de alquiler"
-            value={fmtPct(analysis.gross_yield)}
-            sub="renta anual mediana ÷ precio de venta mediana (unidades comparables del edificio)"
-            accent={analysis.gross_yield != null && analysis.gross_yield >= 0.06 ? "good" : undefined}
+            label="Rentabilidad sobre tu compra"
+            value={fmtPct(analysis.asking_yield)}
+            sub={`renta anual mediana de alquileres similares ÷ el precio de este anuncio (${fmtAED(listing.price)})`}
+            accent={analysis.asking_yield != null && analysis.asking_yield >= 0.06 ? "good" : undefined}
           />
           <Stat
             label="Se alquila por (año, mediana)"
@@ -202,16 +202,16 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
             }`}
           />
           <Stat
+            label="Rentabilidad de mercado (edificio)"
+            value={fmtPct(analysis.gross_yield)}
+            sub="renta anual mediana ÷ precio de venta mediano de unidades comparables — de referencia, no depende de este anuncio"
+          />
+          <Stat
             label="Se vende por (mediana)"
             value={fmtAED(analysis.median_sale_price)}
             sub={`${analysis.buy_n} venta${analysis.buy_n === 1 ? "" : "s"} de tamaño similar (±20%, 24 meses)${
               analysis.sale_p25 != null ? ` · objetivo compra p/ reformar ≈ ${fmtAED(analysis.sale_p25)} (P25)` : ""
             }`}
-          />
-          <Stat
-            label="Rentabilidad sobre el precio del anuncio"
-            value={fmtPct(analysis.asking_yield)}
-            sub={`si lo compras por ${fmtAED(listing.price)}`}
           />
           <Stat
             label="Gimnasio guardado más cercano"
@@ -272,20 +272,20 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
 
 const ANALYSIS_HELP: { term: string; desc: string }[] = [
   {
-    term: "Rentabilidad anual de alquiler",
-    desc: "Renta anual mediana ÷ precio de venta mediana de unidades comparables (mismo edificio, tamaño ±20%, últimos 24 meses). Es la rentabilidad bruta que da el mercado, independiente del precio de este anuncio.",
+    term: "Rentabilidad sobre tu compra",
+    desc: "Renta anual mediana de alquileres de tamaño similar (±20%, mismo edificio, últimos 24 meses) ÷ el precio de ESTE anuncio (lo que vas a pagar). Es la rentabilidad que obtendrías tú comprándolo a ese precio. Es la métrica principal.",
   },
   {
     term: "Se alquila por (año, mediana)",
     desc: "Mediana de los contratos de alquiler anuales de unidades de tamaño similar (±20%) del edificio, últimos 24 meses. El rango es P25–P75: lo que pagan los pisos peor y mejor acondicionados.",
   },
   {
-    term: "Se vende por (mediana)",
-    desc: "Mediana de las ventas registradas en el DLD de tamaño similar (±20%), últimos 24 meses. El P25 es el tramo bajo del mercado ≈ precio objetivo de compra para reformar.",
+    term: "Rentabilidad de mercado (edificio)",
+    desc: "Renta anual mediana ÷ precio de venta mediano de unidades comparables. Es la rentabilidad de referencia del edificio, NO depende del precio de este anuncio — sirve para comparar el anuncio con la media.",
   },
   {
-    term: "Rentabilidad sobre el precio del anuncio",
-    desc: "Renta anual mediana ÷ el precio que pide ESTE anuncio. Indica si este piso, a su precio, rinde por encima o por debajo de la mediana del edificio.",
+    term: "Se vende por (mediana)",
+    desc: "Mediana de las ventas registradas en el DLD de tamaño similar (±20%), últimos 24 meses. El P25 es el tramo bajo del mercado ≈ precio objetivo de compra para reformar.",
   },
   {
     term: "Descuento vs tendencia",

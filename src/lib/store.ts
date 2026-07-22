@@ -216,7 +216,7 @@ export function listFavorites(): FavoriteListing[] {
        FROM favorites f
        JOIN listings l ON l.id = f.listing_id
        LEFT JOIN analyses a ON a.listing_id = f.listing_id
-       ORDER BY a.gross_yield DESC NULLS LAST`
+       ORDER BY a.asking_yield DESC NULLS LAST`
     )
     .all() as FavoriteListing[];
 }
@@ -253,7 +253,7 @@ export function listAnalyzed(): AnalyzedListing[] {
               a.rent_p25, a.rent_p75, a.sale_p25, a.sale_p75,
               a.rent_n, a.buy_n, a.gym_distance_m, a.gym_name, a.computed_at
        FROM listings l JOIN analyses a ON a.listing_id = l.id
-       ORDER BY a.gross_yield DESC NULLS LAST`
+       ORDER BY a.asking_yield DESC NULLS LAST`
     )
     .all() as AnalyzedListing[];
 }
